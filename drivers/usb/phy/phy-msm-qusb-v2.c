@@ -572,6 +572,20 @@ static void qusb_phy_shutdown(struct usb_phy *phy)
 
 	qusb_phy_enable_clocks(qphy, false);
 }
+
+static u32 qusb_phy_get_linestate(struct qusb_phy *qphy)
+{
+	u32 linestate = 0;
+
+	if (qphy->cable_connected) {
+		if (qphy->phy.flags & PHY_HSFS_MODE)
+			linestate |= LINESTATE_DP;
+		else if (qphy->phy.flags & PHY_LS_MODE)
+			linestate |= LINESTATE_DM;
+	}
+	return linestate;
+}
+
 /**
  * Performs QUSB2 PHY suspend/resume functionality.
  *
@@ -614,9 +628,7 @@ static int qusb_phy_set_suspend(struct usb_phy *phy, int suspend)
 			writel_relaxed(0x00,
 				qphy->base + QUSB2PHY_PORT_INTR_CTRL);
 
-			linestate = readl_relaxed(qphy->base +
-					QUSB2PHY_PORT_UTMI_STATUS);
-
+			linestate = qusb_phy_get_linestate(qphy);
 			/*
 			 * D+/D- interrupts are level-triggered, but we are
 			 * only interested if the line state changes, so enable
