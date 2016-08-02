@@ -30,6 +30,7 @@
 
 enum clock_properties {
 	CLOCK_PROP_HAS_SCALING = 1 << 0,
+	CLOCK_PROP_HAS_MEM_RETENTION    = 1 << 1,
 };
 
 static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
@@ -1057,6 +1058,11 @@ static int msm_vidc_load_clock_table(
 			vc->load_freq_tbl = NULL;
 			vc->has_scaling = false;
 		}
+
+		if (clock_props[c] & CLOCK_PROP_HAS_MEM_RETENTION)
+			vc->has_mem_retention = true;
+		else
+			vc->has_mem_retention = false;
 
 		dprintk(VIDC_DBG, "Found clock %s: scale-able = %s\n", vc->name,
 			vc->count ? "yes" : "no");
