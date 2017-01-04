@@ -148,7 +148,6 @@ struct msm_vidc_format {
 	char name[MAX_NAME_LENGTH];
 	u8 description[32];
 	u32 fourcc;
-	int num_planes;
 	int type;
 	u32 (*get_frame_size)(int plane, u32 height, u32 width);
 };
@@ -171,6 +170,8 @@ struct msm_video_device {
 struct session_prop {
 	u32 width[MAX_PORT_NUM];
 	u32 height[MAX_PORT_NUM];
+	u32 num_planes[MAX_PORT_NUM];
+	u32 extradata[MAX_PORT_NUM];
 	u32 fps;
 	u32 bitrate;
 	u32 operating_rate;
@@ -286,7 +287,6 @@ struct msm_vidc_inst {
 	struct completion completions[SESSION_MSG_END - SESSION_MSG_START + 1];
 	struct v4l2_ctrl **cluster;
 	struct v4l2_fh event_handler;
-	struct msm_smem *extradata_handle;
 	bool in_reconfig;
 	u32 reconfig_width;
 	u32 reconfig_height;
