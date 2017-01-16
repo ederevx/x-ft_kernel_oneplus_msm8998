@@ -571,7 +571,8 @@ static bool msm_dcvs_check_supported(struct msm_vidc_inst *inst)
 	inst->dcvs.extra_buffer_count = 0;
 
 	if (!IS_VALID_DCVS_SESSION(num_mbs_per_frame,
-				res->dcvs_limit[inst->session_type].min_mbpf)) {
+		res->dcvs_limit[inst->session_type].min_mbpf) ||
+		(inst->flags & VIDC_THUMBNAIL)) {
 		inst->dcvs.extra_buffer_count = 0;
 		is_dcvs_supported = false;
 		goto dcvs_decision_done;
