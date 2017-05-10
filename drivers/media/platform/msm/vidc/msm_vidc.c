@@ -1496,7 +1496,6 @@ static void cleanup_instance(struct msm_vidc_inst *inst)
 int msm_vidc_destroy(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_core *core;
-	int i = 0;
 
 	if (!inst || !inst->core)
 		return -EINVAL;
@@ -1512,9 +1511,6 @@ int msm_vidc_destroy(struct msm_vidc_inst *inst)
 
 	v4l2_fh_del(&inst->event_handler);
 	v4l2_fh_exit(&inst->event_handler);
-
-	for (i = 0; i < MAX_PORT_NUM; i++)
-		vb2_queue_release(&inst->bufq[i].vb2_bufq);
 
 	DEINIT_MSM_VIDC_LIST(&inst->eosbufs);
 
@@ -1539,7 +1535,7 @@ int msm_vidc_close(void *instance)
 {
 	struct msm_vidc_inst *inst = instance;
 	struct buffer_info *bi, *dummy;
-	int rc = 0;
+	int rc = 0, i = 0;
 
 	if (!inst || !inst->core)
 		return -EINVAL;
@@ -1574,6 +1570,12 @@ int msm_vidc_close(void *instance)
 			"Failed to move video instance to uninit state\n");
 
 	msm_comm_session_clean(inst);
+
+	for (i = 0; i < MAX_PORT_NUM; i++) {
+		mutex_lock(&inst->bufq[i].lock);
+		vb2_queue_release(&inst->bufq[i].vb2_bufq);
+		mutex_unlock(&inst->bufq[i].lock);
+	}
 
 	kref_put(&inst->kref, close_helper);
 	return 0;
