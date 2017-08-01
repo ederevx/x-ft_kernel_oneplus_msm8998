@@ -1448,6 +1448,13 @@ enum v4l2_mpeg_vidc_video_h264_vui_timing_info {
 	V4L2_MPEG_VIDC_VIDEO_H264_VUI_TIMING_INFO_ENABLED = 1
 };
 
+#define V4L2_CID_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME \
+		(V4L2_CID_MPEG_MSM_VIDC_BASE + 103)
+enum v4l2_mpeg_vidc_video_venc_send_skipped_frame {
+	V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_DISABLE = 0,
+	V4L2_MPEG_VIDC_VIDEO_SEND_SKIPPED_FRAME_ENABLE = 1
+};
+
 /*  Camera class control IDs */
 
 #define V4L2_CID_CAMERA_CLASS_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x900)
