@@ -1105,6 +1105,9 @@ void pagefault_out_of_memory(void)
 	if (IS_ENABLED(CONFIG_HAVE_LOW_MEMORY_KILLER))
 		return;
 
+	if (IS_ENABLED(CONFIG_HAVE_LOW_MEMORY_KILLER))
+		return;
+
 	if (mem_cgroup_oom_synchronize(true))
 		return;
 
