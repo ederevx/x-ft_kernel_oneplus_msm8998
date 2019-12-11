@@ -2707,7 +2707,7 @@ static inline bool uclamp_rq_is_idle(struct rq *rq)
  */
 static __always_inline
 unsigned long uclamp_rq_util_with(struct rq *rq, unsigned long util,
-			       struct task_struct *p)
+				  struct task_struct *p)
 {
 	unsigned long min_util = 0;
 	unsigned long max_util = 0;
@@ -2754,8 +2754,9 @@ static inline bool uclamp_is_used(void)
 	return static_branch_likely(&sched_uclamp_used);
 }
 #else /* CONFIG_UCLAMP_TASK */
-static inline unsigned long uclamp_rq_util_with(struct rq *rq, unsigned long util,
-					     struct task_struct *p)
+static inline
+unsigned long uclamp_rq_util_with(struct rq *rq, unsigned long util,
+				  struct task_struct *p)
 {
 	return util;
 }
