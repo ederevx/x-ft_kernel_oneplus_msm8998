@@ -11,3 +11,5 @@ obj-$(CONFIG_QCOM_KGSL) += msm_legacy/
 else
 obj-$(CONFIG_QCOM_KGSL) += msm/
 endif
+
+obj-$(CONFIG_TRACE_GPU_MEM)		+= trace/
