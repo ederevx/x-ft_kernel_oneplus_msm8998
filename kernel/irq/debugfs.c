@@ -57,6 +57,7 @@ static const struct irq_bit_descr irqchip_flags[] = {
 	BIT_MASK_DESCR(IRQCHIP_SKIP_SET_WAKE),
 	BIT_MASK_DESCR(IRQCHIP_ONESHOT_SAFE),
 	BIT_MASK_DESCR(IRQCHIP_EOI_THREADED),
+	BIT_MASK_DESCR(IRQCHIP_ENABLE_WAKEUP_ON_SUSPEND),
 };
 
 static void
@@ -116,6 +117,8 @@ static const struct irq_bit_descr irqdata_states[] = {
 
 	BIT_MASK_DESCR(IRQD_WAKEUP_STATE),
 	BIT_MASK_DESCR(IRQD_WAKEUP_ARMED),
+
+	BIT_MASK_DESCR(IRQD_IRQ_ENABLED_ON_SUSPEND),
 };
 
 static const struct irq_bit_descr irqdesc_states[] = {
