@@ -8002,6 +8002,18 @@ cpu_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 
 #ifdef CONFIG_UCLAMP_TASK_GROUP
 int cpu_ucassist_init_values(struct cgroup_subsys_state *css);
+
+void cpu_uclamp_cgroup_css_online(struct cgroup_subsys_state *css)
+{
+	/* Propagate the effective uclamp value for the new group */
+	mutex_lock(&uclamp_mutex);
+	rcu_read_lock();
+	cpu_util_update_eff(css);
+	rcu_read_unlock();
+	mutex_unlock(&uclamp_mutex);
+
+	cpu_ucassist_init_values(css);
+}
 #endif
 
 /* Expose task group only after completing cgroup initialization */
@@ -8012,17 +8024,6 @@ static int cpu_cgroup_css_online(struct cgroup_subsys_state *css)
 
 	if (parent)
 		sched_online_group(tg, parent);
-
-#ifdef CONFIG_UCLAMP_TASK_GROUP
-	/* Propagate the effective uclamp value for the new group */
-	mutex_lock(&uclamp_mutex);
-	rcu_read_lock();
-	cpu_util_update_eff(css);
-	rcu_read_unlock();
-	mutex_unlock(&uclamp_mutex);
-
-	cpu_ucassist_init_values(css);
-#endif
 
 	return 0;
 }
@@ -8234,14 +8235,14 @@ static ssize_t cpu_uclamp_write(struct kernfs_open_file *of, char *buf,
 	return cpu_uclamp_write_css(of_css(of), buf, clamp_id) ?: nbytes;
 }
 
-static ssize_t cpu_uclamp_min_write(struct kernfs_open_file *of,
+ssize_t cpu_uclamp_min_write(struct kernfs_open_file *of,
 				    char *buf, size_t nbytes,
 				    loff_t off)
 {
 	return cpu_uclamp_write(of, buf, nbytes, off, UCLAMP_MIN);
 }
 
-static ssize_t cpu_uclamp_max_write(struct kernfs_open_file *of,
+ssize_t cpu_uclamp_max_write(struct kernfs_open_file *of,
 				    char *buf, size_t nbytes,
 				    loff_t off)
 {
@@ -8271,13 +8272,13 @@ static inline void cpu_uclamp_print(struct seq_file *sf,
 	seq_printf(sf, "%llu.%0*u\n", percent, UCLAMP_PERCENT_SHIFT, rem);
 }
 
-static int cpu_uclamp_min_show(struct seq_file *sf, void *v)
+int cpu_uclamp_min_show(struct seq_file *sf, void *v)
 {
 	cpu_uclamp_print(sf, UCLAMP_MIN);
 	return 0;
 }
 
-static int cpu_uclamp_max_show(struct seq_file *sf, void *v)
+int cpu_uclamp_max_show(struct seq_file *sf, void *v)
 {
 	cpu_uclamp_print(sf, UCLAMP_MAX);
 	return 0;
@@ -8612,20 +8613,6 @@ static struct cftype cpu_files[] = {
 		.name = "rt_period_us",
 		.read_u64 = cpu_rt_period_read_uint,
 		.write_u64 = cpu_rt_period_write_uint,
-	},
-#endif
-#ifdef CONFIG_UCLAMP_TASK_GROUP
-	{
-		.name = "uclamp.min",
-		.flags = CFTYPE_NOT_ON_ROOT,
-		.seq_show = cpu_uclamp_min_show,
-		.write = cpu_uclamp_min_write,
-	},
-	{
-		.name = "uclamp.max",
-		.flags = CFTYPE_NOT_ON_ROOT,
-		.seq_show = cpu_uclamp_max_show,
-		.write = cpu_uclamp_max_write,
 	},
 #endif
 	{ }	/* Terminate */
