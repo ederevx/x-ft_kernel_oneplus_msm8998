@@ -26,6 +26,7 @@ obj-$(CONFIG_SCHED_AUTOGROUP) += autogroup.o
 obj-$(CONFIG_SCHEDSTATS) += stats.o
 obj-$(CONFIG_SCHED_DEBUG) += debug.o
 obj-$(CONFIG_SCHED_TUNE) += tune.o
+obj-$(CONFIG_SCHED_TUNE_DUMMY) += tune_dummy.o
 obj-$(CONFIG_UCLAMP_TASK_GROUP) += ucassist.o
 obj-$(CONFIG_CGROUP_CPUACCT) += cpuacct.o
 obj-$(CONFIG_CPU_FREQ) += cpufreq.o
