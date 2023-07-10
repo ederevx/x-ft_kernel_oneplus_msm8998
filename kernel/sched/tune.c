@@ -5,6 +5,7 @@
 #include <linux/printk.h>
 #include <linux/rcupdate.h>
 #include <linux/slab.h>
+#include <linux/input.h>
 
 #include <trace/events/sched.h>
 
@@ -16,6 +17,10 @@ extern struct reciprocal_value schedtune_spc_rdiv;
 
 /* We hold schedtune boost in effect for at least this long */
 #define SCHEDTUNE_BOOST_HOLD_NS 50000000ULL
+
+/* Input boost duration, default = 5 secs */
+#define SCHEDTUNE_INPUT_BOOST_MS 5000
+static bool schedtune_input_boost = true;
 
 /*
  * EAS scheduler tunables for task groups.
@@ -522,6 +527,9 @@ int schedtune_cpu_boost(int cpu)
 	struct boost_groups *bg;
 	u64 now;
 
+	if (!READ_ONCE(schedtune_input_boost))
+		return 0;
+
 	bg = &per_cpu(cpu_boost_groups, cpu);
 	now = sched_clock_cpu(cpu);
 
@@ -676,6 +684,94 @@ static struct cftype files[] = {
 	{ }	/* terminate */
 };
 
+static void schedtune_input_fn(struct work_struct *work)
+{
+	WRITE_ONCE(schedtune_input_boost, false);
+	pr_info("schedtune: %d ms elapsed since last input, turned "
+			"off CPU boost\n", SCHEDTUNE_INPUT_BOOST_MS);
+}
+
+static DECLARE_DELAYED_WORK(schedtune_input_work, schedtune_input_fn);
+
+static void schedtune_input_event(struct input_handle *handle,
+		unsigned int type, unsigned int code, int value)
+{
+	if (schedule_delayed_work(&schedtune_input_work, 
+			msecs_to_jiffies(SCHEDTUNE_INPUT_BOOST_MS)))
+		WRITE_ONCE(schedtune_input_boost, true);
+}
+
+static int schedtune_input_connect(struct input_handler *handler,
+		struct input_dev *dev, const struct input_device_id *id)
+{
+	struct input_handle *handle;
+	int error;
+
+	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
+	if (!handle)
+		return -ENOMEM;
+
+	handle->dev = dev;
+	handle->handler = handler;
+	handle->name = "schedtune_input";
+
+	error = input_register_handle(handle);
+	if (error)
+		goto err2;
+
+	error = input_open_device(handle);
+	if (error)
+		goto err1;
+
+	return 0;
+err1:
+	input_unregister_handle(handle);
+err2:
+	kfree(handle);
+	return error;
+}
+
+static void schedtune_input_disconnect(struct input_handle *handle)
+{
+	input_close_device(handle);
+	input_unregister_handle(handle);
+	kfree(handle);
+}
+
+static const struct input_device_id schedtune_input_ids[] = {
+	/* Multi-touch touchscreen */
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
+			INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT_MASK(EV_ABS) },
+		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
+			BIT_MASK(ABS_MT_POSITION_X) |
+			BIT_MASK(ABS_MT_POSITION_Y) }
+	},
+	/* Touchpad */
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
+			INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
+		.absbit = { [BIT_WORD(ABS_X)] =
+			BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
+	},
+	/* Keypad */
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT_MASK(EV_KEY) },
+	},
+	{ }
+};
+
+static struct input_handler schedtune_input_handler = {
+	.event		   = schedtune_input_event,
+	.connect	   = schedtune_input_connect,
+	.disconnect	   = schedtune_input_disconnect,
+	.name		   = "schedtune_input_h",
+	.id_table	   = schedtune_input_ids,
+};
+
 static int
 schedtune_boostgroup_init(struct schedtune *st)
 {
@@ -795,6 +891,8 @@ schedtune_init(void)
 {
 	schedtune_spc_rdiv = reciprocal_value(100);
 	schedtune_init_cgroups();
+	if (input_register_handler(&schedtune_input_handler))
+		pr_err("Failed to register schedtune input handler\n");
 	return 0;
 }
 postcore_initcall(schedtune_init);
