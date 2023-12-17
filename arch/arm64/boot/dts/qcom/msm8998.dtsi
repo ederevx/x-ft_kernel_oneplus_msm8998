@@ -605,21 +605,6 @@
 		};
 	};
 
-	rpm-glink {
-		compatible = "qcom,glink-rpm";
-		interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
-		qcom,rpm-msg-ram = <&rpm_msg_ram>;
-		mboxes = <&apcs_glb 0>;
-
-		qcom,rpm_glink_ssr {
-			qcom,glink-channels = "glink_ssr";
-			qcom,notify-edges = <&glink_modem>,
-					    <&glink_adsp>,
-					    <&glink_slpi>,
-					    <&glink_spss>;
-		};
-	};
-
 	spmi_bus: qcom,spmi@800f000 {
 		compatible = "qcom,spmi-pmic-arb";
 		reg =	<0x800f000 0x1000>,
@@ -671,6 +656,21 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
+
+		glink_rpm: rpm {
+			transport = "smem";
+
+			label = "rpm";
+			qcom,glink-label = "rpm";
+
+			qcom,rpm_glink_ssr {
+				qcom,glink-channels = "glink_ssr";
+				qcom,notify-edges = <&glink_modem>,
+							<&glink_adsp>,
+							<&glink_slpi>,
+							<&glink_spss>;
+			};
+		};
 
 		glink_modem: modem {
 			qcom,remote-pid = <1>;
@@ -839,6 +839,19 @@
 				qcom,glink-channels = "DIAG_CMD";
 				qcom,intents = <0x4000 1 >;
 			};
+		};
+	};
+
+	rpm-glink {
+		compatible = "qcom,glink-rpm";
+		interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
+		qcom,rpm-msg-ram = <&rpm_msg_ram>;
+		mboxes = <&apcs_glb 0>;
+		label = "rpm";
+
+		rpm-requests {
+			compatible = "qcom,rpm-msm8996";
+			qcom,glink-channels = "rpm_requests";
 		};
 	};
 
