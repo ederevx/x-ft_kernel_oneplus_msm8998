@@ -21,8 +21,7 @@ extern struct reciprocal_value schedtune_spc_rdiv;
 #define SCHEDTUNE_BOOST_HOLD_NS 50000000ULL
 
 /* Input boost duration, default = 5 secs */
-#define SCHEDTUNE_INPUT_BOOST_MS 5000
-static bool schedtune_input_boost;
+#define SCHEDTUNE_INPUT_BOOST_MS 5000UL
 
 /*
  * EAS scheduler tunables for task groups.
@@ -689,33 +688,27 @@ static struct cftype files[] = {
 	{ }	/* terminate */
 };
 
-static DECLARE_WAIT_QUEUE_HEAD(schedtune_input_waitq);
+struct schedtune_input {
+	struct input_handler input_handler;
+	struct timer_list timer;
+	struct irq_work irq_work;
+};
 
-static void 
-schedtune_input_boost_set(bool enable)
+static inline unsigned long schedtune_input_timeout(void)
 {
-	schedtune_input_boost = enable;
-	pr_info("%s: boost = %d \n", __func__, schedtune_input_boost);
-	if (wq_has_sleeper(&schedtune_input_waitq))
-		wake_up_all(&schedtune_input_waitq);
+	return jiffies + msecs_to_jiffies(SCHEDTUNE_INPUT_BOOST_MS);
 }
-
-static void 
-schedtune_input_timer_fn(unsigned long data)
-{
-	schedtune_input_boost_set(false);
-}
-static DEFINE_TIMER(schedtune_input_timer, schedtune_input_timer_fn, 0, 0);
 
 static void 
 schedtune_input_event(struct input_handle *handle,
 		unsigned int type, unsigned int code, int value)
 {
-	if (mod_timer(&schedtune_input_timer, jiffies + 
-			msecs_to_jiffies(SCHEDTUNE_INPUT_BOOST_MS)))
-		return;
+	struct schedtune_input *st_in = container_of(handle->handler, 
+			struct schedtune_input, 
+			input_handler);
 
-	schedtune_input_boost_set(true);
+	if (!mod_timer(&st_in->timer, schedtune_input_timeout()))
+		irq_work_queue(&st_in->irq_work);
 }
 
 static int 
@@ -783,92 +776,86 @@ static const struct input_device_id schedtune_input_ids[] = {
 	{ }
 };
 
-static struct input_handler schedtune_input_handler = {
-	.event		   = schedtune_input_event,
-	.connect	   = schedtune_input_connect,
-	.disconnect	   = schedtune_input_disconnect,
-	.name		   = "schedtune_input_h",
-	.id_table	   = schedtune_input_ids,
-};
-
-static int 
-schedtune_input_thread(void *data)
+static void 
+schedtune_input_timer_fn(unsigned long data)
 {
-	int cpu = (int)(long)data;
-	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
-	struct boost_groups *bg = &per_cpu(cpu_boost_groups, cpu);
-	struct rq *rq = cpu_rq(cpu);
-	unsigned long flags;
-	bool state;
+	struct schedtune_input *st_in = (void *)data;
+	irq_work_queue(&st_in->irq_work);
+}
 
-	/* Match schedutil */
-	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
+static void 
+schedtune_input_irq(struct irq_work *irq_work)
+{
+	struct schedtune_input *st_in = container_of(irq_work, 
+			struct schedtune_input, 
+			irq_work);
+	struct boost_groups *bg;
+	bool input_boost = timer_pending(&st_in->timer);
+	int level = 0;
+	int cpu;
 
-	pr_info("%s: created for CPU%d\n", __func__, cpu);
+	pr_info("%s: boost = %d \n", __func__, input_boost);
 
-	while (!kthread_should_stop()) {
-		if (signal_pending(current))
-			flush_signals(current);
-
-		if (wait_event_interruptible(schedtune_input_waitq,
-				(state = READ_ONCE(schedtune_input_boost))
-				!= bg->input_boost))
-			continue;
-
-		raw_spin_lock_irqsave(&rq->lock, flags);
-		bg->input_boost = state;
-		schedtune_cpu_update(cpu, sched_clock_cpu(cpu));
-		/* No point in updating util if CPU won't be affected */
-		if (!bg->boost_max) {
-			raw_spin_unlock_irqrestore(&rq->lock, flags);
-			continue;
-		}
-		cpufreq_update_util(rq, 0);
-		raw_spin_unlock_irqrestore(&rq->lock, flags);
-
-		pr_info("%s: notified CPU%d \n", __func__, cpu);
+	for_each_possible_cpu(cpu) {
+		if (level == 0)
+			raw_spin_lock(&cpu_rq(cpu)->lock);
+		else
+			raw_spin_lock_nested(&cpu_rq(cpu)->lock, level);
+		level++;
 	}
 
-	pr_err("%s: stopped for CPU%d\n", __func__, cpu);
-	return 0;
+	for_each_possible_cpu(cpu) {
+		bg = &per_cpu(cpu_boost_groups, cpu);
+		bg->input_boost = input_boost;
+
+		/* Skip non-boosted or idle CPUs */
+		if (!bg->boost_max || idle_cpu(cpu))
+			continue;
+
+		update_rq_clock(cpu_rq(cpu));
+		cpufreq_update_util(cpu_rq(cpu), 0);
+	}
+
+	for_each_possible_cpu(cpu)
+		raw_spin_unlock(&cpu_rq(cpu)->lock);
+
+	pr_info("%s: updated CPU util \n", __func__);
 }
 
 static void
 schedtune_init_input_boost(void)
 {
+	struct schedtune_input *st_in;
 	struct boost_groups *bg;
-	struct task_struct *thread;
-	int initialized = 0, cpu;
+	int cpu;
 
 	/* Enable boost by default */
-	schedtune_input_boost = true;
-
 	for_each_possible_cpu(cpu) {
 		bg = &per_cpu(cpu_boost_groups, cpu);
-		bg->input_boost = schedtune_input_boost;
+		bg->input_boost = true;
 	}
 
-	if (input_register_handler(&schedtune_input_handler)) {
+	st_in = kzalloc(sizeof(*st_in), GFP_KERNEL);
+	if (!st_in)
+		return;
+
+	init_irq_work(&st_in->irq_work, schedtune_input_irq);
+
+	setup_timer(&st_in->timer, schedtune_input_timer_fn, 
+			(unsigned long)st_in);
+
+	st_in->input_handler.event = schedtune_input_event;
+	st_in->input_handler.connect = schedtune_input_connect;
+	st_in->input_handler.disconnect = schedtune_input_disconnect;
+	st_in->input_handler.name = "schedtune_input_h";
+	st_in->input_handler.id_table = schedtune_input_ids;
+	if (input_register_handler(&st_in->input_handler)) {
 		pr_err("%s: failed to register input handler\n", __func__);
+		kfree(st_in);
 		return;
 	}
 
-	for_each_possible_cpu(cpu) {
-		thread = kthread_run(schedtune_input_thread, 
-					(void *)(long)cpu, "st_input:%d", cpu);
-		if (!IS_ERR(thread))
-			initialized++;
-		else
-			pr_err("%s: failed to create kthread for CPU%d\n", 
-					__func__, cpu);
-	}
-
-	/* At least one thread should be present */
-	if (initialized > 0)
-		return;
-
-	input_unregister_handler(&schedtune_input_handler);
-	pr_err("%s: unregistered input handler\n", __func__);
+	pr_info("%s: initialized", __func__);
 }
 
 static int
