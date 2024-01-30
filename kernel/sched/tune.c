@@ -688,11 +688,11 @@ static struct cftype files[] = {
 	{ }	/* terminate */
 };
 
-struct schedtune_input {
+static struct {
 	struct input_handler input_handler;
 	struct timer_list timer;
 	struct irq_work irq_work;
-};
+} st_in;
 
 static inline unsigned long schedtune_input_timeout(void)
 {
@@ -703,12 +703,8 @@ static void
 schedtune_input_event(struct input_handle *handle,
 		unsigned int type, unsigned int code, int value)
 {
-	struct schedtune_input *st_in = container_of(handle->handler, 
-			struct schedtune_input, 
-			input_handler);
-
-	if (!mod_timer(&st_in->timer, schedtune_input_timeout()))
-		irq_work_queue(&st_in->irq_work);
+	if (!mod_timer(&st_in.timer, schedtune_input_timeout()))
+		irq_work_queue(&st_in.irq_work);
 }
 
 static int 
@@ -779,45 +775,33 @@ static const struct input_device_id schedtune_input_ids[] = {
 static void 
 schedtune_input_timer_fn(unsigned long data)
 {
-	struct schedtune_input *st_in = (void *)data;
-	irq_work_queue(&st_in->irq_work);
+	irq_work_queue(&st_in.irq_work);
 }
 
 static void 
 schedtune_input_irq(struct irq_work *irq_work)
 {
-	struct schedtune_input *st_in = container_of(irq_work, 
-			struct schedtune_input, 
-			irq_work);
 	struct boost_groups *bg;
-	bool input_boost = timer_pending(&st_in->timer);
-	int level = 0;
+	struct rq *rq;
+	bool input_boost;
 	int cpu;
 
+	input_boost = timer_pending(&st_in.timer);
 	pr_info("%s: boost = %d \n", __func__, input_boost);
 
 	for_each_possible_cpu(cpu) {
-		if (level == 0)
-			raw_spin_lock(&cpu_rq(cpu)->lock);
-		else
-			raw_spin_lock_nested(&cpu_rq(cpu)->lock, level);
-		level++;
-	}
-
-	for_each_possible_cpu(cpu) {
+		rq = cpu_rq(cpu);
 		bg = &per_cpu(cpu_boost_groups, cpu);
+
+		raw_spin_lock(&rq->lock);
 		bg->input_boost = input_boost;
-
-		/* Skip non-boosted or idle CPUs */
-		if (!bg->boost_max || idle_cpu(cpu))
-			continue;
-
-		update_rq_clock(cpu_rq(cpu));
-		cpufreq_update_util(cpu_rq(cpu), 0);
+		/* Don't update non-boosted CPU util */
+		if (bg->boost_max) {
+			update_rq_clock(rq);
+			cpufreq_update_util(rq, 0);
+		}
+		raw_spin_unlock(&rq->lock);
 	}
-
-	for_each_possible_cpu(cpu)
-		raw_spin_unlock(&cpu_rq(cpu)->lock);
 
 	pr_info("%s: updated CPU util \n", __func__);
 }
@@ -825,7 +809,6 @@ schedtune_input_irq(struct irq_work *irq_work)
 static void
 schedtune_init_input_boost(void)
 {
-	struct schedtune_input *st_in;
 	struct boost_groups *bg;
 	int cpu;
 
@@ -835,23 +818,20 @@ schedtune_init_input_boost(void)
 		bg->input_boost = true;
 	}
 
-	st_in = kzalloc(sizeof(*st_in), GFP_KERNEL);
-	if (!st_in)
-		return;
+	memset(&st_in, 0, sizeof(st_in));
 
-	init_irq_work(&st_in->irq_work, schedtune_input_irq);
+	init_irq_work(&st_in.irq_work, schedtune_input_irq);
 
-	setup_timer(&st_in->timer, schedtune_input_timer_fn, 
-			(unsigned long)st_in);
+	setup_timer(&st_in.timer, schedtune_input_timer_fn, 0);
 
-	st_in->input_handler.event = schedtune_input_event;
-	st_in->input_handler.connect = schedtune_input_connect;
-	st_in->input_handler.disconnect = schedtune_input_disconnect;
-	st_in->input_handler.name = "schedtune_input_h";
-	st_in->input_handler.id_table = schedtune_input_ids;
-	if (input_register_handler(&st_in->input_handler)) {
+	st_in.input_handler.event = schedtune_input_event;
+	st_in.input_handler.connect = schedtune_input_connect;
+	st_in.input_handler.disconnect = schedtune_input_disconnect;
+	st_in.input_handler.name = "schedtune_input_h";
+	st_in.input_handler.id_table = schedtune_input_ids;
+	if (input_register_handler(&st_in.input_handler)) {
 		pr_err("%s: failed to register input handler\n", __func__);
-		kfree(st_in);
+		memset(&st_in, 0, sizeof(st_in));
 		return;
 	}
 
