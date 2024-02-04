@@ -643,11 +643,59 @@ static int clk_rcg2_set_floor_rate_and_parent(struct clk_hw *hw,
 	return __clk_rcg2_set_rate(hw, rate, FLOOR);
 }
 
+static int __clk_rcg2_reconfigure(struct clk_hw *hw)
+{
+	const struct clk_ops *hw_ops = hw->init->ops;
+	struct clk_hw *parent_hw;
+	unsigned long rate, parent_rate;
+	int ret, i;
+
+	if (!hw_ops->set_rate || !hw_ops->set_parent)
+		return 0;
+
+	/* Reconfigure RCG values at prepare after handoff and 
+	   initial set_rate */
+	rate = clk_hw_get_rate(hw);
+	if (!rate || clk_rcg2_is_enabled(hw))
+		return 0;
+
+	parent_hw = clk_hw_get_parent(hw);
+	parent_rate = clk_hw_get_rate(parent_hw);
+	if (!parent_rate)
+		return 0;
+
+	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+		if (parent_hw != clk_hw_get_parent_by_index(hw, i))
+			continue;
+
+		ret = hw_ops->set_parent(hw, i);
+		if (ret)
+			return ret;
+		break;
+	}
+
+	return hw_ops->set_rate(hw, rate, parent_rate);
+}
+
+static void clk_rcg2_reconfigure(struct clk_hw *hw)
+{
+	int ret;
+
+	/* It is not fatal if this fails, but it will affect performance */
+	ret = __clk_rcg2_reconfigure(hw);
+	if (ret)
+		pr_warn("%s: Failed to reconfigure %s ret=%d", __func__,
+				clk_hw_get_name(hw), ret);
+}
+
 static int clk_rcg2_prepare(struct clk_hw *hw)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
 	u32 cfg;
 	int ret;
+
+	if (rcg->flags & RECONFIGURE_RCG)
+		clk_rcg2_reconfigure(hw);
 
 	if (rcg->flags & HW_CLK_CTRL_MODE)
 		return 0;
@@ -1078,6 +1126,7 @@ static int clk_byte_set_rate_and_parent(struct clk_hw *hw,
 
 const struct clk_ops clk_byte_ops = {
 	.is_enabled = clk_rcg2_is_enabled,
+	.prepare = clk_rcg2_prepare,
 	.get_parent = clk_rcg2_get_parent,
 	.set_parent = clk_rcg2_set_parent,
 	.recalc_rate = clk_rcg2_recalc_rate,
@@ -1152,6 +1201,7 @@ static int clk_byte2_set_rate_and_parent(struct clk_hw *hw,
 
 const struct clk_ops clk_byte2_ops = {
 	.is_enabled = clk_rcg2_is_enabled,
+	.prepare = clk_rcg2_prepare,
 	.get_parent = clk_rcg2_get_parent,
 	.set_parent = clk_rcg2_set_parent,
 	.recalc_rate = clk_rcg2_recalc_rate,
@@ -1258,6 +1308,7 @@ static int clk_pixel_set_rate_and_parent(struct clk_hw *hw, unsigned long rate,
 
 const struct clk_ops clk_pixel_ops = {
 	.is_enabled = clk_rcg2_is_enabled,
+	.prepare = clk_rcg2_prepare,
 	.get_parent = clk_rcg2_get_parent,
 	.set_parent = clk_rcg2_set_parent,
 	.recalc_rate = clk_rcg2_recalc_rate,
