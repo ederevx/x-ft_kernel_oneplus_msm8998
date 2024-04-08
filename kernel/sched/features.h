@@ -4,7 +4,7 @@
  * Using the avg_vruntime, do the right thing and preserve lag across
  * sleep+wake cycles. EEVDF placement strategy #1, #2 if disabled.
  */
-SCHED_FEAT(PLACE_LAG, true)
+SCHED_FEAT(PLACE_LAG, false)
 SCHED_FEAT(PLACE_DEADLINE_INITIAL, true)
 SCHED_FEAT(RUN_TO_PARITY, true)
 
