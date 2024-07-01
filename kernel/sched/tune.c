@@ -267,6 +267,8 @@ schedtune_cpu_update(int cpu, u64 now)
 	bg->boost_ts = boost_ts;
 }
 
+static void schedtune_input_irq_work(void);
+
 static int
 schedtune_boostgroup_update(int idx, int boost)
 {
@@ -311,6 +313,10 @@ schedtune_boostgroup_update(int idx, int boost)
 
 		trace_sched_tune_boostgroup_update(cpu, 0, bg->boost_max);
 	}
+
+	/* Notify cpufreq immediately if any boost value has been set */
+	if (boost)
+		schedtune_input_irq_work();
 
 	return 0;
 }
@@ -699,12 +705,18 @@ static inline unsigned long schedtune_input_timeout(void)
 	return jiffies + msecs_to_jiffies(SCHEDTUNE_INPUT_BOOST_MS);
 }
 
+static void
+schedtune_input_irq_work(void)
+{
+	irq_work_queue(&st_in.irq_work);
+}
+
 static void 
 schedtune_input_event(struct input_handle *handle,
 		unsigned int type, unsigned int code, int value)
 {
 	if (!mod_timer(&st_in.timer, schedtune_input_timeout()))
-		irq_work_queue(&st_in.irq_work);
+		schedtune_input_irq_work();
 }
 
 static int 
@@ -775,7 +787,7 @@ static const struct input_device_id schedtune_input_ids[] = {
 static void 
 schedtune_input_timer_fn(unsigned long data)
 {
-	irq_work_queue(&st_in.irq_work);
+	schedtune_input_irq_work();
 }
 
 static void 
