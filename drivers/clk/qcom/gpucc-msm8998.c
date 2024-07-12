@@ -560,11 +560,8 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 
 	clk_fabia_pll_configure(&gpu_pll0_pll, regmap, &gpu_pll0_config);
 
-	/* Force periph logic on to avoid perf counter corruption */
-	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(13), BIT(13));
-
 	/* Tweak droop detector (GPUCC_GPU_DD_WRAP_CTRL) to reduce leakage */
-	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x430, BIT(0), BIT(0));
 
 	rc = qcom_cc_really_probe(pdev, &gpucc_msm8998_desc, regmap);
 	if (rc) {
@@ -573,6 +570,12 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 	}
 
 	enable_gfx_crc(base);
+
+	/*
+	 * Force periph logic to be ON since after NAP, the value of the perf
+	 * counter might be corrupted frequently.
+	 */
+	clk_set_flags(gpucc_gfx3d_clk.clkr.hw.clk, CLKFLAG_RETAIN_PERIPH);
 
 	dev_info(&pdev->dev, "Registered GPUCC clocks\n");
 	return 0;
