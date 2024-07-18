@@ -619,8 +619,7 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static struct workqueue_struct *lpm_wq;
-static struct work_struct lpm_work;
+static struct task_struct *lpm_task;
 static struct clk *xo_lpm_clk;
 static struct device_node *mpm_node;
 
@@ -630,14 +629,11 @@ static int msm_mpm_get_lpm_clk(void)
 {
 	int ret = 0;
 
-	if (xo_lpm_clk)
-		return ret;
-
 	xo_lpm_clk = of_clk_get_by_name(mpm_node, "xo_lpm_clk");
 	if (IS_ERR(xo_lpm_clk)) {
 		ret = PTR_ERR(xo_lpm_clk);
 		if (ret != -EPROBE_DEFER)
-			pr_err("%s: The xo_lpm_clk clock cannot be found: %d\n", 
+			pr_err("%s: xo_lpm_clk cannot be found ret=%d\n", 
 				__func__, ret);
 		xo_lpm_clk = NULL;
 	}
@@ -648,15 +644,8 @@ static int msm_mpm_get_lpm_clk(void)
 static void msm_mpm_vote_lpm_clk(bool set_wake)
 {
 	static bool xo_lpm_enabled = false;
-	static DEFINE_MUTEX(lpm_lock);
 	unsigned long flags;
 	int i, allow = 0, ret = 0;
-
-	if (!lpm_initialized)
-		return;
-
-	if (msm_mpm_get_lpm_clk())
-		return;
 
 	spin_lock_irqsave(&mpm_lock, flags);
 	for (i = 0; i < MSM_MPM_NR_IRQ_DOMAINS; i++) {
@@ -668,68 +657,101 @@ static void msm_mpm_vote_lpm_clk(bool set_wake)
 	}
 	spin_unlock_irqrestore(&mpm_lock, flags);
 
-	mutex_lock(&lpm_lock);
 	if (allow == MSM_MPM_NR_IRQ_DOMAINS) {
 		if (xo_lpm_enabled) {
 			clk_disable_unprepare(xo_lpm_clk);
 			xo_lpm_enabled = false;
 			pr_info_ratelimited(
-				"%s: Voted xo_lpm_clk off", __func__);
+				"%s: voted off", __func__);
 		}
 	} else {
 		if (!xo_lpm_enabled) {
 			ret = clk_prepare_enable(xo_lpm_clk);
 			if (ret) {
-				pr_err("%s: Failed to enable xo_lpm_clk", __func__);
+				pr_err("%s: failed to enable xo_lpm_clk", __func__);
 			} else {
 				xo_lpm_enabled = true;
 				pr_info_ratelimited(
-					"%s: Voted xo_lpm_clk on", __func__);
+					"%s: voted on", __func__);
 			}
 		}
 	}
-	mutex_unlock(&lpm_lock);
-}
-
-void msm_mpm_suspend_prepare(void)
-{
-	msm_mpm_in_suspend = true;
-	msm_mpm_vote_lpm_clk(true);
-}
-
-void msm_mpm_suspend_wake(void)
-{
-	msm_mpm_vote_lpm_clk(false);
-	msm_mpm_in_suspend = false;
 }
 
 #define LPM_POLL_MSEC 100
 static void msm_mpm_lpm_work_fn(struct work_struct *work)
 {
+	int ret = 0;
+	bool from_suspend = false;
+
 	while (1) {
 		msleep(LPM_POLL_MSEC);
+		if (!lpm_initialized)
+			continue;
+		ret = msm_mpm_get_lpm_clk();
+		if (ret == -EPROBE_DEFER)
+			continue;
+		break;
+	}
+
+	if (ret)
+		goto err;
+
+	lpm_task = current;
+
+	while (1) {
 		if (!msm_mpm_in_suspend)
 			msm_mpm_vote_lpm_clk(false);
+		else if (!from_suspend)
+			msm_mpm_vote_lpm_clk(true);
+
+		from_suspend = msm_mpm_in_suspend;
+
+		if (!msm_mpm_in_suspend) {
+			schedule_timeout_interruptible(
+				msecs_to_jiffies(LPM_POLL_MSEC));
+		} else {
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule();
+		}
 	}
+
+err:
+	lpm_task = NULL;
+	pr_err("%s: killed, ret=%d", __func__, ret);
+}
+static DECLARE_WORK(lpm_work, msm_mpm_lpm_work_fn);
+
+void msm_mpm_suspend_prepare(void)
+{
+	msm_mpm_in_suspend = true;
+	if (lpm_task)
+		wake_up_process(lpm_task);
 }
 
-static int msm_mpm_lpm_init(struct device_node *node)
+void msm_mpm_suspend_wake(void)
 {
+	msm_mpm_in_suspend = false;
+	if (lpm_task)
+		wake_up_process(lpm_task);
+}
+
+static void msm_mpm_lpm_init(struct device_node *node)
+{
+	struct workqueue_struct *wq;
+
 	mpm_node = node;
 
-	INIT_WORK(&lpm_work, msm_mpm_lpm_work_fn);
-	lpm_wq = create_singlethread_workqueue("mpm-lpm");
-
-	if (lpm_wq) {
-		queue_work(lpm_wq, &lpm_work);
+	wq = create_singlethread_workqueue("mpm-lpm");
+	if (wq) {
+		queue_work(wq, &lpm_work);
 	} else {
-		pr_warn("%s: Failed to create wq. So voting against XO off",
-				__func__);
-		clk_prepare_enable(xo_lpm_clk);
+		pr_warn("%s: can't create wq, using system long wq", 
+			__func__);
+		queue_work(system_long_wq, &lpm_work);
 	}
 
-	pr_info("%s: MPM LPM initialized", __func__);
-	return 0;
+	pr_info("%s: initialized", __func__);
 }
 
 static int msm_mpm_init(struct device_node *node)
