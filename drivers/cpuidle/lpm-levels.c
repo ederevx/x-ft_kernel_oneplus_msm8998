@@ -48,6 +48,7 @@
 #include "lpm-levels.h"
 #include <trace/events/power.h>
 #include "../clk/clk.h"
+#include "../irqchip/qcom/mpm.h"
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_low_power.h>
 #include <linux/arm-smccc.h>
@@ -1718,6 +1719,7 @@ static void register_cluster_lpm_stats(struct lpm_cluster *cl,
 static int lpm_suspend_prepare(void)
 {
 	suspend_in_progress = true;
+	msm_mpm_suspend_prepare();
 	lpm_stats_suspend_enter();
 
 	return 0;
@@ -1726,6 +1728,7 @@ static int lpm_suspend_prepare(void)
 static void lpm_suspend_wake(void)
 {
 	suspend_in_progress = false;
+	msm_mpm_suspend_wake();
 	lpm_stats_suspend_exit();
 }
 
