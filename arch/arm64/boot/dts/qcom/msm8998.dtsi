@@ -493,6 +493,8 @@
 		interrupt-controller;
 		interrupt-parent = <&intc>;
 		#interrupt-cells = <3>;
+		clocks = <&clock_rpmcc CXO_SMD_LPM_CLK>;
+		clock-names = "xo_lpm_clk";
 	};
 
 	wakegpio: wake-gpio {
