@@ -32,6 +32,7 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/cpu_pm.h>
+#include <linux/clk.h>
 #include <asm/arch_timer.h>
 #include <soc/qcom/rpm-notifier.h>
 #include <soc/qcom/lpm_levels.h>
@@ -54,6 +55,12 @@
 #define QCOM_MPM_REG_WIDTH  DIV_ROUND_UP(num_mpm_irqs, 32)
 #define MPM_REGISTER(reg, index) ((reg * QCOM_MPM_REG_WIDTH + index + 2) * (4))
 
+enum {
+	MSM_MPM_GIC_IRQ_DOMAIN,
+	MSM_MPM_GPIO_IRQ_DOMAIN,
+	MSM_MPM_NR_IRQ_DOMAINS,
+};
+
 struct msm_mpm_device_data {
 	struct device *dev;
 	void __iomem *mpm_request_reg_base;
@@ -63,6 +70,11 @@ struct msm_mpm_device_data {
 	struct irq_domain *gpio_chip_domain;
 };
 
+struct msm_mpm_unlisted_irq {
+	struct irq_domain *domain;
+	unsigned long *enable_irqs, *wake_irqs;
+};
+
 static int msm_pm_sleep_time_override;
 static int num_mpm_irqs = 64;
 module_param_named(sleep_time_override,
@@ -70,6 +82,8 @@ module_param_named(sleep_time_override,
 static struct msm_mpm_device_data msm_mpm_dev_data;
 static unsigned int *mpm_to_irq;
 static DEFINE_SPINLOCK(mpm_lock);
+static struct msm_mpm_unlisted_irq unlisted_irqs[MSM_MPM_NR_IRQ_DOMAINS];
+static bool lpm_initialized = false;
 
 static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
 {
@@ -79,6 +93,8 @@ static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
 		return -ENODEV;
 
 	for (i = 0; mpm_data[i].pin >= 0; i++) {
+		if (mpm_data[i].pin == 0xff) /* These are blacklisted */
+			break;
 		if (mpm_data[i].pin == mpm_pin)
 			return mpm_to_irq[mpm_data[i].pin];
 	}
@@ -132,7 +148,35 @@ static inline void msm_mpm_write(unsigned int reg,
 	} while (r_value != value);
 }
 
-static inline void msm_mpm_enable_irq(struct irq_data *d, bool on)
+static inline void msm_mpm_set_unlisted_irq(struct irq_data *d, bool on,
+					bool set_wake)
+{
+	unsigned long *irqs;
+	unsigned long flags;
+	int i;
+
+	for (i = 0; i < MSM_MPM_NR_IRQ_DOMAINS; i++) {
+		if (d->domain == unlisted_irqs[i].domain)
+			break;
+	}
+
+	if (i == MSM_MPM_NR_IRQ_DOMAINS)
+		return;
+
+	irqs = !set_wake ? 
+		unlisted_irqs[i].enable_irqs :
+		unlisted_irqs[i].wake_irqs;
+
+	spin_lock_irqsave(&mpm_lock, flags);
+	if (on)
+		__set_bit(d->hwirq, irqs);
+	else
+		__clear_bit(d->hwirq, irqs);
+	spin_unlock_irqrestore(&mpm_lock, flags);
+}
+
+static inline void msm_mpm_enable_irq(struct irq_data *d, bool on, 
+					bool set_wake)
 {
 	int mpm_pin[MAX_MPM_PIN_PER_IRQ] = {-1, -1};
 	unsigned long flags;
@@ -144,7 +188,16 @@ static inline void msm_mpm_enable_irq(struct irq_data *d, bool on)
 	reg = MPM_REG_ENABLE;
 	msm_get_mpm_pin(d, mpm_pin);
 	for (i = 0; i < MAX_MPM_PIN_PER_IRQ; i++) {
-		if (mpm_pin[i] < 0)
+		if (mpm_pin[i] == 0xff)
+			return;
+
+		if (mpm_pin[i] < 0) {
+			msm_mpm_set_unlisted_irq(d, on, set_wake);
+			return;
+		}
+
+		/* We only want to track unlisted irqs for set_wake */
+		if (set_wake)
 			return;
 
 		index = mpm_pin[i]/32;
@@ -187,6 +240,9 @@ static void msm_mpm_set_type(struct irq_data *d,
 
 	msm_get_mpm_pin(d, mpm_pin);
 	for (i = 0; i < MAX_MPM_PIN_PER_IRQ; i++) {
+		if (mpm_pin[i] == 0xff)
+			return;
+
 		if (mpm_pin[i] < 0)
 			return;
 
@@ -217,12 +273,18 @@ static void msm_mpm_set_type(struct irq_data *d,
 
 static void msm_mpm_gpio_chip_mask(struct irq_data *d)
 {
-	msm_mpm_enable_irq(d, false);
+	msm_mpm_enable_irq(d, false, false);
 }
 
 static void msm_mpm_gpio_chip_unmask(struct irq_data *d)
 {
-	msm_mpm_enable_irq(d, true);
+	msm_mpm_enable_irq(d, true, false);
+}
+
+static int msm_mpm_gpio_chip_set_wake(struct irq_data *d, unsigned int on)
+{
+	msm_mpm_enable_irq(d, on, true);
+	return 0;
 }
 
 static int msm_mpm_gpio_chip_set_type(struct irq_data *d, unsigned int type)
@@ -233,14 +295,20 @@ static int msm_mpm_gpio_chip_set_type(struct irq_data *d, unsigned int type)
 
 static void msm_mpm_gic_chip_mask(struct irq_data *d)
 {
-	msm_mpm_enable_irq(d, false);
+	msm_mpm_enable_irq(d, false, false);
 	irq_chip_mask_parent(d);
 }
 
 static void msm_mpm_gic_chip_unmask(struct irq_data *d)
 {
-	msm_mpm_enable_irq(d, true);
+	msm_mpm_enable_irq(d, true, false);
 	irq_chip_unmask_parent(d);
+}
+
+static int msm_mpm_gic_chip_set_wake(struct irq_data *d, unsigned int on)
+{
+	msm_mpm_enable_irq(d, on, true);
+	return irq_chip_set_wake_parent(d, on);
 }
 
 static int msm_mpm_gic_chip_set_type(struct irq_data *d, unsigned int type)
@@ -270,7 +338,7 @@ static struct irq_chip msm_mpm_gic_chip = {
 	.irq_disable	= msm_mpm_gic_chip_mask,
 	.irq_unmask	= msm_mpm_gic_chip_unmask,
 	.irq_retrigger	= irq_chip_retrigger_hierarchy,
-	.irq_set_wake	= irq_chip_set_wake_parent,
+	.irq_set_wake	= msm_mpm_gic_chip_set_wake,
 	.irq_set_type	= msm_mpm_gic_chip_set_type,
 	.flags		= IRQCHIP_MASK_ON_SUSPEND,
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
@@ -283,8 +351,9 @@ static struct irq_chip msm_mpm_gpio_chip = {
 	.irq_mask	= msm_mpm_gpio_chip_mask,
 	.irq_disable	= msm_mpm_gpio_chip_mask,
 	.irq_unmask	= msm_mpm_gpio_chip_unmask,
+	.irq_set_wake	= msm_mpm_gpio_chip_set_wake,
 	.irq_set_type	= msm_mpm_gpio_chip_set_type,
-	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+	.flags		= IRQCHIP_MASK_ON_SUSPEND,
 	.irq_retrigger          = irq_chip_retrigger_hierarchy,
 };
 
@@ -550,6 +619,119 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static struct workqueue_struct *lpm_wq;
+static struct work_struct lpm_work;
+static struct clk *xo_lpm_clk;
+static struct device_node *mpm_node;
+
+static bool msm_mpm_in_suspend = false;
+
+static int msm_mpm_get_lpm_clk(void)
+{
+	int ret = 0;
+
+	if (xo_lpm_clk)
+		return ret;
+
+	xo_lpm_clk = of_clk_get_by_name(mpm_node, "xo_lpm_clk");
+	if (IS_ERR(xo_lpm_clk)) {
+		ret = PTR_ERR(xo_lpm_clk);
+		if (ret != -EPROBE_DEFER)
+			pr_err("%s: The xo_lpm_clk clock cannot be found: %d\n", 
+				__func__, ret);
+		xo_lpm_clk = NULL;
+	}
+
+	return ret;
+}
+
+static void msm_mpm_vote_lpm_clk(bool set_wake)
+{
+	static bool xo_lpm_enabled = false;
+	static DEFINE_MUTEX(lpm_lock);
+	unsigned long flags;
+	int i, allow = 0, ret = 0;
+
+	if (!lpm_initialized)
+		return;
+
+	if (msm_mpm_get_lpm_clk())
+		return;
+
+	spin_lock_irqsave(&mpm_lock, flags);
+	for (i = 0; i < MSM_MPM_NR_IRQ_DOMAINS; i++) {
+		unsigned long *irqs = !set_wake ?
+			unlisted_irqs[i].enable_irqs :
+			unlisted_irqs[i].wake_irqs;
+		allow += bitmap_empty(irqs, 
+			unlisted_irqs[i].domain->revmap_size);
+	}
+	spin_unlock_irqrestore(&mpm_lock, flags);
+
+	mutex_lock(&lpm_lock);
+	if (allow == MSM_MPM_NR_IRQ_DOMAINS) {
+		if (xo_lpm_enabled) {
+			clk_disable_unprepare(xo_lpm_clk);
+			xo_lpm_enabled = false;
+			pr_info_ratelimited(
+				"%s: Voted xo_lpm_clk off", __func__);
+		}
+	} else {
+		if (!xo_lpm_enabled) {
+			ret = clk_prepare_enable(xo_lpm_clk);
+			if (ret) {
+				pr_err("%s: Failed to enable xo_lpm_clk", __func__);
+			} else {
+				xo_lpm_enabled = true;
+				pr_info_ratelimited(
+					"%s: Voted xo_lpm_clk on", __func__);
+			}
+		}
+	}
+	mutex_unlock(&lpm_lock);
+}
+
+void msm_mpm_suspend_prepare(void)
+{
+	msm_mpm_in_suspend = true;
+	msm_mpm_vote_lpm_clk(true);
+}
+
+void msm_mpm_suspend_wake(void)
+{
+	msm_mpm_vote_lpm_clk(false);
+	msm_mpm_in_suspend = false;
+}
+
+#define LPM_POLL_MSEC 100
+static void msm_mpm_lpm_work_fn(struct work_struct *work)
+{
+	while (1) {
+		msleep(LPM_POLL_MSEC);
+		if (!msm_mpm_in_suspend)
+			msm_mpm_vote_lpm_clk(false);
+	}
+}
+
+static int msm_mpm_lpm_init(struct device_node *node)
+{
+	mpm_node = node;
+
+	INIT_WORK(&lpm_work, msm_mpm_lpm_work_fn);
+	lpm_wq = create_singlethread_workqueue("mpm-lpm");
+
+	if (lpm_wq) {
+		queue_work(lpm_wq, &lpm_work);
+	} else {
+		pr_warn("%s: Failed to create wq. So voting against XO off",
+				__func__);
+		clk_prepare_enable(xo_lpm_clk);
+	}
+
+	pr_info("%s: MPM LPM initialized", __func__);
+	return 0;
+}
+
 static int msm_mpm_init(struct device_node *node)
 {
 	struct msm_mpm_device_data *dev = &msm_mpm_dev_data;
@@ -604,6 +786,8 @@ static int msm_mpm_init(struct device_node *node)
 			dev->ipc_irq, ret);
 		goto set_wake_irq_err;
 	}
+
+	msm_mpm_lpm_init(node);
 
 	return register_system_pm_ops(&pm_ops);
 
@@ -692,6 +876,32 @@ static const struct of_device_id mpm_gpio_chip_data_table[] = {
 
 MODULE_DEVICE_TABLE(of, mpm_gpio_chip_data_table);
 
+static void mpm_unlisted_irq_init(struct irq_domain *d, int irq_domain)
+{
+	unlisted_irqs[irq_domain].domain = d;
+
+	unlisted_irqs[irq_domain].enable_irqs =
+		kcalloc(BITS_TO_LONGS(d->revmap_size), 
+			sizeof(*unlisted_irqs[irq_domain].enable_irqs),
+			GFP_KERNEL);
+	if (!unlisted_irqs[irq_domain].enable_irqs) {
+		pr_err("%s: failed to allocate enable irqs set %d", __func__, irq_domain);
+		return;
+	}
+
+	unlisted_irqs[irq_domain].wake_irqs =
+		kcalloc(BITS_TO_LONGS(d->revmap_size), 
+			sizeof(*unlisted_irqs[irq_domain].wake_irqs),
+			GFP_KERNEL);
+	if (!unlisted_irqs[irq_domain].wake_irqs) {
+		pr_err("%s: failed to allocate wake irqs set %d", __func__, irq_domain);
+		return;
+	}
+
+	if (irq_domain == MSM_MPM_GIC_IRQ_DOMAIN)
+		lpm_initialized = true;
+}
+
 static int __init mpm_gic_chip_init(struct device_node *node,
 					struct device_node *parent)
 {
@@ -732,6 +942,9 @@ static int __init mpm_gic_chip_init(struct device_node *node,
 		goto mpm_map_err;
 	}
 
+	mpm_unlisted_irq_init(msm_mpm_dev_data.gic_chip_domain,
+		MSM_MPM_GIC_IRQ_DOMAIN);
+
 	ret = msm_mpm_init(node);
 	if (!ret)
 		return ret;
@@ -761,6 +974,9 @@ static int __init mpm_gpio_chip_init(struct device_node *node,
 
 	if (!msm_mpm_dev_data.gpio_chip_domain)
 		return -ENOMEM;
+
+	mpm_unlisted_irq_init(msm_mpm_dev_data.gpio_chip_domain,
+		MSM_MPM_GPIO_IRQ_DOMAIN);
 
 	return 0;
 }

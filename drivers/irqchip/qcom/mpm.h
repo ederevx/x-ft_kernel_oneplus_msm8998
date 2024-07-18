@@ -16,6 +16,23 @@
 #include <linux/irq.h>
 #include <linux/device.h>
 
+/*
+ * msm_mpm_suspend_prepare() - Called at prepare_late() op during suspend
+ *
+ * When called the MPM driver checks if the wakeup interrupts can be monitored
+ * by MPM hardware and program them accordingly. If wake up interrupts cannot
+ * be monitored then it disallows system low power modes.
+ */
+void msm_mpm_suspend_prepare(void);
+
+/*
+ * msm_mpm_suspend_wake - Called during wake() op in suspend.
+ * 
+ * When called MPM drivers sets the vote for system low power modes depending
+ * on the active interrupts.
+ */
+void msm_mpm_suspend_wake(void);
+
 struct mpm_pin {
 	int pin;
 	irq_hw_number_t hwirq;
