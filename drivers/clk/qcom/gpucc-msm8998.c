@@ -109,11 +109,6 @@ static struct clk_branch gpucc_xo = {
 	},
 };
 
-static struct pll_vco fabia_vco[] = {
-	{ 249600000, 2000000000, 0 },
-	{ 125000000, 1000000000, 1 },
-};
-
 /* Initial configuration for 360MHz */
 static const struct alpha_pll_config gpu_pll0_config = {
 	.l = 0x12,
@@ -126,8 +121,6 @@ static const struct alpha_pll_config gpu_pll0_config = {
 static struct clk_alpha_pll gpu_pll0_pll = {
 	.offset = 0x0,
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
-	.vco_table = fabia_vco,
-	.num_vco = ARRAY_SIZE(fabia_vco),
 	.config = &gpu_pll0_config,
 	.clkr.hw.init = &(struct clk_init_data) {
 			.name = "gpu_cc_pll0",
