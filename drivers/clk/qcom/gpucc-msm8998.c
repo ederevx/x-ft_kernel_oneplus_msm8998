@@ -70,7 +70,7 @@ static DEFINE_VDD_REGULATORS(vdd_gpucc_mx, VDD_MX_NUM, 1, vdd_corner);
 
 enum {
 	P_GPU_XO,
-	P_GPLL0,
+	P_GPLL0_OUT_MAIN,
 	P_GPU_CC_PLL0_OUT_EVEN,
 	P_GPU_CC_PLL0_OUT_MAIN,
 	P_CRC_DIV,
@@ -88,7 +88,7 @@ static const char * const gpucc_parent_names_0[] = {
 
 static const struct parent_map gpucc_parent_map_1[] = {
 	{ P_GPU_XO, 0 },
-	{ P_GPLL0, 5 },
+	{ P_GPLL0_OUT_MAIN, 5 },
 };
 
 static const char * const gpucc_parent_names_1[] = {
@@ -123,21 +123,29 @@ static struct clk_alpha_pll gpu_pll0_pll = {
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
 	.config = &gpu_pll0_config,
 	.clkr.hw.init = &(struct clk_init_data) {
-			.name = "gpu_cc_pll0",
-			.parent_names = (const char *[]){ "gpucc_xo" },
-			.num_parents = 1,
-			.ops = &clk_alpha_pll_fabia_ops,
-			VDD_GPU_MX_FMAX_MAP1(MIN, 1420000500),
+		.name = "gpu_cc_pll0",
+		.parent_names = (const char *[]){ "gpucc_xo" },
+		.num_parents = 1,
+		.ops = &clk_alpha_pll_fabia_ops,
+		VDD_GPU_MX_FMAX_MAP1(MIN, 1420000500),
 	},
+};
+
+static const struct clk_div_table clk_fabia_even_div_table[] = {
+	{ 0x0, 1 },
+	{ 0x1, 2 },
+	{ 0x3, 4 },
+	{ 0x7, 8 },
+	{},
 };
 
 static struct clk_alpha_pll_postdiv gpu_pll0_out_even = {
 	.offset = 0x0,
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
 	.width = 4,
-	.post_div_table = clk_alpha_div_table,
+	.post_div_table = clk_fabia_even_div_table,
 	.post_div_shift = ALPHA_POST_DIV_EVEN_SHIFT,
-	.num_post_div = ARRAY_SIZE(clk_alpha_div_table),
+	.num_post_div = ARRAY_SIZE(clk_fabia_even_div_table),
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "gpucc_pll0_out_even",
 		.parent_names = (const char *[]){ "gpu_cc_pll0" },
@@ -217,9 +225,9 @@ static struct clk_rcg2 rbbmtimer_clk_src = {
 
 static struct freq_tbl ftbl_gfx3d_isense_clk_src[] = {
 	F(  19200000,  P_GPU_XO,    1,    0,     0),
-	F(  40000000,   P_GPLL0,   15,    0,     0),
-	F( 200000000,   P_GPLL0,    3,    0,     0),
-	F( 300000000,   P_GPLL0,    2,    0,     0),
+	F(  40000000,  P_GPLL0_OUT_MAIN,   15,    0,     0),
+	F( 200000000,  P_GPLL0_OUT_MAIN,    3,    0,     0),
+	F( 300000000,  P_GPLL0_OUT_MAIN,    2,    0,     0),
 	{ }
 };
 
@@ -240,7 +248,7 @@ static struct clk_rcg2 gfx3d_isense_clk_src = {
 
 static struct freq_tbl ftbl_rbcpr_clk_src[] = {
 	F( 19200000,  P_GPU_XO,    1,    0,     0),
-	F( 50000000,   P_GPLL0,   12,    0,     0),
+	F( 50000000,  P_GPLL0_OUT_MAIN,   12,    0,     0),
 	{ }
 };
 
