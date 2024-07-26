@@ -116,6 +116,8 @@ static const struct alpha_pll_config gpu_pll0_config = {
 	.config_ctl_val = 0x20485699,
 	.config_ctl_hi_val = 0x00002067,
 	.user_ctl_hi_val = 0x00004805,
+	.post_div_mask = 0xf << 8,
+	.post_div_val = 0x1 << 8, /* fixed at div-2 */
 };
 
 static struct clk_alpha_pll gpu_pll0_pll = {
@@ -131,36 +133,12 @@ static struct clk_alpha_pll gpu_pll0_pll = {
 	},
 };
 
-static const struct clk_div_table clk_fabia_even_div_table[] = {
-	{ 0x0, 1 },
-	{ 0x1, 2 },
-	{ 0x3, 4 },
-	{ 0x7, 8 },
-	{},
-};
-
-static struct clk_alpha_pll_postdiv gpu_pll0_out_even = {
-	.offset = 0x0,
-	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
-	.width = 4,
-	.post_div_table = clk_fabia_even_div_table,
-	.post_div_shift = ALPHA_POST_DIV_EVEN_SHIFT,
-	.num_post_div = ARRAY_SIZE(clk_fabia_even_div_table),
-	.clkr.hw.init = &(struct clk_init_data){
-		.name = "gpucc_pll0_out_even",
-		.parent_names = (const char *[]){ "gpu_cc_pll0" },
-		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
-		.ops = &clk_alpha_pll_postdiv_fabia_ops,
-	},
-};
-
 static struct clk_fixed_factor crc_div = {
 	.mult = 1,
 	.div = 2,
 	.hw.init = &(struct clk_init_data) {
 		.name = "crc_div",
-		.parent_names = (const char *[]){ "gpucc_pll0_out_even" },
+		.parent_names = (const char *[]){ "gpu_cc_pll0" },
 		.num_parents = 1,
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_fixed_factor_ops,
@@ -464,7 +442,6 @@ static struct mux_clk gfxcc_dbg_clk = {
 
 static struct clk_regmap *gpucc_msm8998_clocks[] = {
 	[GPU_PLL0_PLL] = &gpu_pll0_pll.clkr,
-	[GPU_PLL0_PLL_OUT_EVEN] = &gpu_pll0_out_even.clkr,
 	[GFX3D_CLK_SRC] = &gfx3d_clk_src.clkr,
 	[GPUCC_GFX3D_CLK] = &gpucc_gfx3d_clk.clkr,
 	//[GPUCC_DBG_CLK] = &gfxcc_dbg_clk.clkr,
