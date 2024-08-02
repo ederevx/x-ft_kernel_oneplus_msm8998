@@ -5434,15 +5434,14 @@ int op_handle_switcher_power_ok(void)
 int op_contrl(int enable, bool check_power_ok)
 {
 	pr_info("%s, en=%d\n", __func__, enable);
+
 	if (!g_chg)
 		return 0;
-	if (enable) {
-		if (check_power_ok)
-			op_handle_switcher_power_ok();
-	} else {
-		op_set_collapse_fet(g_chg, enable);
-	}
 
+	if (enable && check_power_ok)
+		op_handle_switcher_power_ok();
+
+	op_set_collapse_fet(g_chg, enable);
 	return 0;
 }
 
