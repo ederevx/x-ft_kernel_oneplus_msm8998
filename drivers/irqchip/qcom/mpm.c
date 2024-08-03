@@ -83,6 +83,7 @@ static struct msm_mpm_device_data msm_mpm_dev_data;
 static unsigned int *mpm_to_irq;
 static DEFINE_SPINLOCK(mpm_lock);
 static struct msm_mpm_unlisted_irq unlisted_irqs[MSM_MPM_NR_IRQ_DOMAINS];
+static struct task_struct *lpm_task;
 static bool lpm_initialized = false;
 
 static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
@@ -173,6 +174,9 @@ static inline void msm_mpm_set_unlisted_irq(struct irq_data *d, bool on,
 	else
 		__clear_bit(d->hwirq, irqs);
 	spin_unlock_irqrestore(&mpm_lock, flags);
+
+	if (lpm_task)
+		wake_up_process(lpm_task);
 }
 
 static inline void msm_mpm_enable_irq(struct irq_data *d, bool on, 
@@ -619,33 +623,36 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-#define LPM_POLL_MSEC 100
-
-static struct task_struct *lpm_task;
 static struct device_node *mpm_node;
 
-static bool msm_mpm_in_suspend = false;
+static atomic_t msm_mpm_in_suspend = ATOMIC_INIT(0);
 
-static void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
+static inline void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
 {
 	static bool xo_lpm_enabled = false;
 	unsigned long flags;
-	int i, allow = 0, ret = 0;
+	int i, ret = 0;
+	bool vote_en = false;
 
-	spin_lock_irqsave(&mpm_lock, flags);
 	for (i = 0; i < MSM_MPM_NR_IRQ_DOMAINS; i++) {
 		unsigned long *irqs = !set_wake ?
 			unlisted_irqs[i].enable_irqs :
 			unlisted_irqs[i].wake_irqs;
-		allow += bitmap_empty(irqs, 
-			unlisted_irqs[i].domain->revmap_size);
-	}
-	spin_unlock_irqrestore(&mpm_lock, flags);
+		unsigned int size = 
+			unlisted_irqs[i].domain->revmap_size;
 
-	if ((allow == MSM_MPM_NR_IRQ_DOMAINS) != xo_lpm_enabled)
+		spin_lock_irqsave(&mpm_lock, flags);
+		vote_en = !bitmap_empty(irqs, size);
+		spin_unlock_irqrestore(&mpm_lock, flags);
+
+		if (vote_en)
+			break;
+	}
+
+	if (vote_en == xo_lpm_enabled)
 		return;
 
-	if (xo_lpm_enabled) {
+	if (!vote_en) {
 		clk_disable_unprepare(clk);
 		xo_lpm_enabled = false;
 	} else {
@@ -662,19 +669,24 @@ static void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
 
 static int msm_mpm_lpm_loop(void *data)
 {
-	struct clk *clk = data;
-	bool from_suspend = false;
+	static bool in_suspend, from_suspend;
+	static struct clk *clk;
+
+	in_suspend = from_suspend = false;
+	clk = data;
 
 	while (1) {
-		if (!msm_mpm_in_suspend)
+		__set_current_state(TASK_INTERRUPTIBLE);
+		schedule();
+
+		in_suspend = atomic_read(&msm_mpm_in_suspend);
+
+		if (!in_suspend)
 			msm_mpm_vote_lpm_clk(clk, false);
 		else if (!from_suspend)
 			msm_mpm_vote_lpm_clk(clk, true);
 
-		from_suspend = msm_mpm_in_suspend;
-
-		schedule_timeout_interruptible(
-			msecs_to_jiffies(LPM_POLL_MSEC));
+		from_suspend = in_suspend;
 	}
 
 	return 0;
@@ -687,7 +699,7 @@ static void msm_mpm_lpm_work_init(struct work_struct *work)
 	int ret = 0;
 
 	while (1) {
-		msleep(LPM_POLL_MSEC);
+		msleep_interruptible(100);
 
 		if (!lpm_initialized)
 			continue;
@@ -722,14 +734,14 @@ static DECLARE_WORK(lpm_work_init, msm_mpm_lpm_work_init);
 
 void msm_mpm_suspend_prepare(void)
 {
-	msm_mpm_in_suspend = true;
+	atomic_set(&msm_mpm_in_suspend, 1);
 	if (lpm_task)
 		wake_up_process(lpm_task);
 }
 
 void msm_mpm_suspend_wake(void)
 {
-	msm_mpm_in_suspend = false;
+	atomic_set(&msm_mpm_in_suspend, 0);
 	if (lpm_task)
 		wake_up_process(lpm_task);
 }
