@@ -61,6 +61,13 @@ enum {
 	MSM_MPM_NR_IRQ_DOMAINS,
 };
 
+enum {
+	MPM_LPM_STATE_INIT,
+	MPM_LPM_STATE_WAKE,
+	MPM_LPM_STATE_ACTIVE,
+	MPM_LPM_STATE_IN_SUSPEND,
+};
+
 struct msm_mpm_device_data {
 	struct device *dev;
 	void __iomem *mpm_request_reg_base;
@@ -84,7 +91,18 @@ static unsigned int *mpm_to_irq;
 static DEFINE_SPINLOCK(mpm_lock);
 static struct msm_mpm_unlisted_irq unlisted_irqs[MSM_MPM_NR_IRQ_DOMAINS];
 static struct task_struct *lpm_task;
-static bool lpm_initialized = false;
+static unsigned long lpm_state = 0;
+
+static inline void msm_mpm_lpm_wake_loop(void)
+{
+	if (!test_bit(MPM_LPM_STATE_INIT, &lpm_state))
+		return;
+
+	if (!test_bit(MPM_LPM_STATE_ACTIVE, &lpm_state))
+		wake_up_process(lpm_task);
+	else
+		set_bit(MPM_LPM_STATE_WAKE, &lpm_state);
+}
 
 static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
 {
@@ -175,8 +193,7 @@ static inline void msm_mpm_set_unlisted_irq(struct irq_data *d, bool on,
 		__clear_bit(d->hwirq, irqs);
 	spin_unlock_irqrestore(&mpm_lock, flags);
 
-	if (lpm_task)
-		wake_up_process(lpm_task);
+	msm_mpm_lpm_wake_loop();
 }
 
 static inline void msm_mpm_enable_irq(struct irq_data *d, bool on, 
@@ -625,8 +642,6 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 
 static struct device_node *mpm_node;
 
-static atomic_t msm_mpm_in_suspend = ATOMIC_INIT(0);
-
 static inline void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
 {
 	static bool xo_lpm_enabled = false;
@@ -676,10 +691,14 @@ static int msm_mpm_lpm_loop(void *data)
 	clk = data;
 
 	while (1) {
-		__set_current_state(TASK_INTERRUPTIBLE);
-		schedule();
+		if (!test_and_clear_bit(MPM_LPM_STATE_WAKE, &lpm_state)) {
+			__set_current_state(TASK_INTERRUPTIBLE);
+			clear_bit(MPM_LPM_STATE_ACTIVE, &lpm_state);
+			schedule();
+			set_bit(MPM_LPM_STATE_ACTIVE, &lpm_state);
+		}
 
-		in_suspend = atomic_read(&msm_mpm_in_suspend);
+		in_suspend = test_bit(MPM_LPM_STATE_IN_SUSPEND, &lpm_state);
 
 		if (!in_suspend)
 			msm_mpm_vote_lpm_clk(clk, false);
@@ -700,9 +719,6 @@ static void msm_mpm_lpm_work_init(struct work_struct *work)
 
 	while (1) {
 		msleep_interruptible(100);
-
-		if (!lpm_initialized)
-			continue;
 
 		clk = of_clk_get_by_name(mpm_node, "xo_lpm_clk");
 		if (IS_ERR(clk)) {
@@ -725,6 +741,7 @@ static void msm_mpm_lpm_work_init(struct work_struct *work)
 	}
 	lpm_task = task;
 
+	set_bit(MPM_LPM_STATE_INIT, &lpm_state);
 	pr_info("%s: initialized", __func__);
 	return;
 err:
@@ -734,16 +751,14 @@ static DECLARE_WORK(lpm_work_init, msm_mpm_lpm_work_init);
 
 void msm_mpm_suspend_prepare(void)
 {
-	atomic_set(&msm_mpm_in_suspend, 1);
-	if (lpm_task)
-		wake_up_process(lpm_task);
+	set_bit(MPM_LPM_STATE_IN_SUSPEND, &lpm_state);
+	msm_mpm_lpm_wake_loop();
 }
 
 void msm_mpm_suspend_wake(void)
 {
-	atomic_set(&msm_mpm_in_suspend, 0);
-	if (lpm_task)
-		wake_up_process(lpm_task);
+	clear_bit(MPM_LPM_STATE_IN_SUSPEND, &lpm_state);
+	msm_mpm_lpm_wake_loop();
 }
 
 static void msm_mpm_lpm_init(struct device_node *node)
@@ -917,9 +932,6 @@ static void mpm_unlisted_irq_init(struct irq_domain *d, int irq_domain)
 		pr_err("%s: failed to allocate wake irqs set %d", __func__, irq_domain);
 		return;
 	}
-
-	if (irq_domain == MSM_MPM_GIC_IRQ_DOMAIN)
-		lpm_initialized = true;
 }
 
 static int __init mpm_gic_chip_init(struct device_node *node,
