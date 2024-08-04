@@ -80,6 +80,7 @@ struct msm_mpm_device_data {
 struct msm_mpm_unlisted_irq {
 	struct irq_domain *domain;
 	unsigned long *enable_irqs, *wake_irqs;
+	bool enable_vote, wake_vote;
 };
 
 static int msm_pm_sleep_time_override;
@@ -170,30 +171,41 @@ static inline void msm_mpm_write(unsigned int reg,
 static inline void msm_mpm_set_unlisted_irq(struct irq_data *d, bool on,
 					bool set_wake)
 {
+	struct msm_mpm_unlisted_irq *uirqs;
 	unsigned long *irqs;
 	unsigned long flags;
+	bool lpm_vote, last_lpm_vote;
 	int i;
 
 	for (i = 0; i < MSM_MPM_NR_IRQ_DOMAINS; i++) {
-		if (d->domain == unlisted_irqs[i].domain)
+		uirqs = &unlisted_irqs[i];
+		if (d->domain == uirqs->domain)
 			break;
 	}
 
 	if (i == MSM_MPM_NR_IRQ_DOMAINS)
 		return;
 
-	irqs = !set_wake ? 
-		unlisted_irqs[i].enable_irqs :
-		unlisted_irqs[i].wake_irqs;
+	irqs = !set_wake ? uirqs->enable_irqs : uirqs->wake_irqs;
 
 	spin_lock_irqsave(&mpm_lock, flags);
 	if (on)
 		__set_bit(d->hwirq, irqs);
 	else
 		__clear_bit(d->hwirq, irqs);
+
+	lpm_vote = !bitmap_empty(irqs, uirqs->domain->revmap_size);
+	if (!set_wake) {
+		last_lpm_vote = uirqs->enable_vote;
+		uirqs->enable_vote = lpm_vote;
+	} else {
+		last_lpm_vote = uirqs->wake_vote;
+		uirqs->wake_vote = lpm_vote;
+	}
 	spin_unlock_irqrestore(&mpm_lock, flags);
 
-	msm_mpm_lpm_wake_loop();
+	if (lpm_vote != last_lpm_vote)
+		msm_mpm_lpm_wake_loop();
 }
 
 static inline void msm_mpm_enable_irq(struct irq_data *d, bool on, 
@@ -650,14 +662,10 @@ static inline void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
 	bool vote_en = false;
 
 	for (i = 0; i < MSM_MPM_NR_IRQ_DOMAINS; i++) {
-		unsigned long *irqs = !set_wake ?
-			unlisted_irqs[i].enable_irqs :
-			unlisted_irqs[i].wake_irqs;
-		unsigned int size = 
-			unlisted_irqs[i].domain->revmap_size;
-
 		spin_lock_irqsave(&mpm_lock, flags);
-		vote_en = !bitmap_empty(irqs, size);
+		vote_en = !set_wake ?
+			unlisted_irqs[i].enable_vote :
+			unlisted_irqs[i].wake_vote;
 		spin_unlock_irqrestore(&mpm_lock, flags);
 
 		if (vote_en)
