@@ -5945,9 +5945,11 @@ void set_chg_ibat_vbat_max(
 			ibat, vfloat);
 
 	vote(chg->fcc_votable,
-		DEFAULT_VOTER, true, ibat * 1000);
+		BATT_PROFILE_VOTER, true, ibat * 1000);
+	chg->batt_profile_fcc_ua = ibat * 1000;
 	vote(chg->fv_votable,
-		DEFAULT_VOTER, true, vfloat * 1000);
+		BATT_PROFILE_VOTER, true, vfloat * 1000);
+	chg->batt_profile_fv_uv = vfloat * 1000;
 
 	/* set cc to cv 100mv lower than vfloat */
 	set_property_on_fg(chg, POWER_SUPPLY_PROP_CC_TO_CV_POINT, vfloat - 100);
