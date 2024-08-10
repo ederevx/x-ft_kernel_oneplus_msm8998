@@ -136,6 +136,8 @@ struct boost_groups {
 	} group[BOOSTGROUPS_COUNT];
 	/* CPU's boost group locking */
 	raw_spinlock_t lock;
+	/* IRQ for updating CPU util */
+	struct irq_work cpu_work;
 };
 
 /* Boost groups affecting each CPU in the system */
@@ -259,6 +261,18 @@ schedtune_cpu_update(int cpu, u64 now)
 	bg->boost_ts = boost_ts;
 }
 
+static void
+schedtune_boostgroup_update_cpu(struct irq_work *work)
+{
+	struct rq *rq = this_rq();
+	struct rq_flags rf;
+
+	rq_lock(rq, &rf);
+	update_rq_clock(rq);
+	cpufreq_update_util(rq, 0);
+	rq_unlock(rq, &rf);
+}
+
 static int
 schedtune_boostgroup_update(int idx, int boost)
 {
@@ -289,6 +303,7 @@ schedtune_boostgroup_update(int idx, int boost)
 			schedtune_boost_group_active(idx, bg, now)) {
 			bg->boost_max = boost;
 			bg->boost_ts = bg->group[idx].ts;
+			irq_work_queue_on(&bg->cpu_work, cpu);
 
 			trace_sched_tune_boostgroup_update(cpu, 1, bg->boost_max);
 			continue;
@@ -779,6 +794,8 @@ schedtune_init_cgroups(void)
 		bg = &per_cpu(cpu_boost_groups, cpu);
 		memset(bg, 0, sizeof(struct boost_groups));
 		raw_spin_lock_init(&bg->lock);
+		init_irq_work(&bg->cpu_work, 
+				schedtune_boostgroup_update_cpu);
 	}
 
 	pr_info("schedtune: configured to support %d boost groups\n",
