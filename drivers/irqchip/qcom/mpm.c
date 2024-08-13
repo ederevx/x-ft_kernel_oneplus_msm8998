@@ -694,10 +694,8 @@ static inline void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
 
 static int msm_mpm_lpm_loop(void *data)
 {
-	static bool in_suspend, from_suspend;
 	static struct clk *clk;
 
-	in_suspend = from_suspend = false;
 	clk = data;
 
 	while (1) {
@@ -708,14 +706,8 @@ static int msm_mpm_lpm_loop(void *data)
 			set_bit(MPM_LPM_STATE_ACTIVE, &lpm_state);
 		}
 
-		in_suspend = test_bit(MPM_LPM_STATE_IN_SUSPEND, &lpm_state);
-
-		if (!in_suspend)
-			msm_mpm_vote_lpm_clk(clk, false);
-		else if (!from_suspend)
-			msm_mpm_vote_lpm_clk(clk, true);
-
-		from_suspend = in_suspend;
+		msm_mpm_vote_lpm_clk(clk, test_bit(
+				MPM_LPM_STATE_IN_SUSPEND, &lpm_state));
 	}
 
 	return 0;
