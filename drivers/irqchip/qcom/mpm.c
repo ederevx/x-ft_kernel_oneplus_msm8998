@@ -33,6 +33,7 @@
 #include <linux/platform_device.h>
 #include <linux/cpu_pm.h>
 #include <linux/clk.h>
+#include <linux/suspend.h>
 #include <asm/arch_timer.h>
 #include <soc/qcom/rpm-notifier.h>
 #include <soc/qcom/lpm_levels.h>
@@ -93,6 +94,7 @@ static DEFINE_SPINLOCK(mpm_lock);
 static struct msm_mpm_unlisted_irq unlisted_irqs[MSM_MPM_NR_IRQ_DOMAINS];
 static struct task_struct *lpm_task;
 static unsigned long lpm_state = 0;
+static bool should_wake = false;
 
 static inline void msm_mpm_lpm_wake_loop(void)
 {
@@ -540,6 +542,7 @@ static int msm_get_apps_irq(unsigned int mpm_irq)
 
 static void system_pm_exit_sleep(bool success)
 {
+	should_wake = false;
 	msm_rpm_exit_sleep();
 }
 
@@ -600,6 +603,7 @@ static int system_pm_enter_sleep(struct cpumask *mask)
 	if (ret)
 		return ret;
 	msm_mpm_enter_sleep(mask);
+	should_wake = true;
 	return ret;
 }
 
@@ -626,6 +630,9 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 	unsigned int mpm_irq;
 	struct irq_desc *desc = NULL;
 	unsigned int reg = MPM_REG_ENABLE;
+
+	if (should_wake)
+		pm_system_wakeup();
 
 	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
 		value[i] = msm_mpm_read(reg, i);
@@ -817,19 +824,10 @@ static int msm_mpm_init(struct device_node *node)
 		goto ipc_irq_err;
 	}
 
-	ret = irq_set_irq_wake(dev->ipc_irq, 1);
-	if (ret) {
-		pr_err("failed to set wakeup irq %lu: %d\n",
-			dev->ipc_irq, ret);
-		goto set_wake_irq_err;
-	}
-
 	msm_mpm_lpm_init(node);
 
 	return register_system_pm_ops(&pm_ops);
 
-set_wake_irq_err:
-	free_irq(dev->ipc_irq, msm_mpm_irq);
 ipc_irq_err:
 	iounmap(dev->mpm_ipc_reg);
 ipc_reg_err:
