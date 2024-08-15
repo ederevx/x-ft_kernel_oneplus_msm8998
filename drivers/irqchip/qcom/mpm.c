@@ -831,8 +831,12 @@ static void mpm_stored_irq_init(void)
 	if (!stored_irqs.wake_irqs) {
 		pr_err("%s: failed to allocate wake irqs set", 
 				__func__);
-		return;
+		goto enable_free;
 	}
+
+	return;
+enable_free:
+	kfree(stored_irqs.enable_irqs);
 }
 
 static int msm_mpm_init(struct device_node *node)
@@ -982,7 +986,7 @@ static void mpm_unlisted_irq_init(struct irq_domain *d, int irq_domain)
 			GFP_KERNEL);
 	if (!unlisted_irqs[irq_domain].enable_irqs) {
 		pr_err("%s: failed to allocate enable irqs set %d", __func__, irq_domain);
-		return;
+		goto domain_unmap;
 	}
 
 	unlisted_irqs[irq_domain].wake_irqs =
@@ -991,8 +995,14 @@ static void mpm_unlisted_irq_init(struct irq_domain *d, int irq_domain)
 			GFP_KERNEL);
 	if (!unlisted_irqs[irq_domain].wake_irqs) {
 		pr_err("%s: failed to allocate wake irqs set %d", __func__, irq_domain);
-		return;
+		goto enable_free;
 	}
+
+	return;
+enable_free:
+	kfree(unlisted_irqs[irq_domain].enable_irqs);
+domain_unmap:
+	unlisted_irqs[irq_domain].domain = NULL;
 }
 
 static int __init mpm_gic_chip_init(struct device_node *node,
