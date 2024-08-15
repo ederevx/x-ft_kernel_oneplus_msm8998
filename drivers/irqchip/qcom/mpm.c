@@ -86,6 +86,7 @@ struct msm_mpm_unlisted_irq {
 
 struct msm_mpm_stored_irq {
 	uint32_t *enable_irqs, *wake_irqs;
+	bool set_wake;
 };
 
 static int msm_pm_sleep_time_override;
@@ -257,6 +258,9 @@ static inline void msm_mpm_enable_irq(struct irq_data *d, bool on,
 			sirqs->enable_irqs[index] = enable;
 		else
 			sirqs->wake_irqs[index] = enable;
+
+		if (sirqs->set_wake == set_wake)
+			msm_mpm_write(reg, index, enable);
 		spin_unlock_irqrestore(&mpm_lock, flags);
 	}
 }
@@ -534,14 +538,15 @@ static void msm_mpm_set_wake_irqs(bool set_wake)
 	unsigned int reg;
 
 	reg = MPM_REG_ENABLE;
+	spin_lock_irqsave(&mpm_lock, flags);
+	sirqs->set_wake = set_wake;
 	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
-		spin_lock_irqsave(&mpm_lock, flags);
 		if (!set_wake)
 			msm_mpm_write(reg, i, sirqs->enable_irqs[i]);
 		else
 			msm_mpm_write(reg, i, sirqs->wake_irqs[i]);
-		spin_unlock_irqrestore(&mpm_lock, flags);
 	}
+	spin_unlock_irqrestore(&mpm_lock, flags);
 
 	pr_info_ratelimited("%s: set %s irqs", __func__, 
 			set_wake ? "wake" : "enable");
@@ -809,6 +814,8 @@ static void msm_mpm_lpm_init(struct device_node *node)
 
 static void mpm_stored_irq_init(void)
 {
+	stored_irqs.set_wake = false;
+
 	stored_irqs.enable_irqs = kcalloc(QCOM_MPM_REG_WIDTH, 
 			sizeof(*stored_irqs.enable_irqs),
 			GFP_KERNEL);
