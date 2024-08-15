@@ -229,7 +229,8 @@ static inline void msm_mpm_enable_irq(struct irq_data *d, bool on,
 			return;
 
 		if (mpm_pin[i] < 0) {
-			msm_mpm_set_unlisted_irq(d, on, set_wake);
+			if (i == 0)
+				msm_mpm_set_unlisted_irq(d, on, set_wake);
 			return;
 		}
 
