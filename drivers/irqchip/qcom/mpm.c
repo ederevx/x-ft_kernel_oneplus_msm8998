@@ -547,9 +547,6 @@ static void msm_mpm_set_wake_irqs(bool set_wake)
 			msm_mpm_write(reg, i, sirqs->wake_irqs[i]);
 	}
 	spin_unlock_irqrestore(&mpm_lock, flags);
-
-	pr_info_ratelimited("%s: set %s irqs", __func__, 
-			set_wake ? "wake" : "enable");
 }
 
 static void msm_mpm_enter_sleep(struct cpumask *cpumask)
@@ -730,9 +727,6 @@ static inline void msm_mpm_vote_lpm_clk(struct clk *clk, bool set_wake)
 		else
 			xo_lpm_enabled = true;
 	}
-
-	pr_info_ratelimited("%s: voted %s", __func__, 
-			xo_lpm_enabled ? "on" : "off");
 }
 
 static int msm_mpm_lpm_loop(void *data)
