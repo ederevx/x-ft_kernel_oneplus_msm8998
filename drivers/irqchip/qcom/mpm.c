@@ -364,6 +364,13 @@ static int msm_mpm_gic_chip_set_wake(struct irq_data *d, unsigned int on)
 static int msm_mpm_gic_chip_set_type(struct irq_data *d, unsigned int type)
 {
 	msm_mpm_set_type(d, type);
+
+	if (type & IRQ_TYPE_EDGE_BOTH)
+		type = IRQ_TYPE_EDGE_RISING;
+
+	if (type & IRQ_TYPE_LEVEL_MASK)
+		type = IRQ_TYPE_LEVEL_HIGH;
+
 	return irq_chip_set_type_parent(d, type);
 }
 
