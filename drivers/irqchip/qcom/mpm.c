@@ -460,38 +460,7 @@ static int msm_mpm_gic_chip_translate(struct irq_domain *d,
 					unsigned long *hwirq,
 					unsigned int *type)
 {
-	if (is_of_node(fwspec->fwnode)) {
-		if (fwspec->param_count < 3)
-			return -EINVAL;
-
-		switch (fwspec->param[0]) {
-		case 0:			/* SPI */
-			*hwirq = fwspec->param[1] + 32;
-			break;
-		case 1:			/* PPI */
-			*hwirq = fwspec->param[1] + 16;
-			break;
-		case GIC_IRQ_TYPE_LPI:	/* LPI */
-			*hwirq = fwspec->param[1];
-			break;
-		default:
-			return -EINVAL;
-		}
-
-		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-		return 0;
-	}
-
-	if (is_fwnode_irqchip(fwspec->fwnode)) {
-		if (fwspec->param_count != 2)
-			return -EINVAL;
-
-		*hwirq = fwspec->param[0];
-		*type = fwspec->param[1];
-		return 0;
-	}
-
-	return -EINVAL;
+	return d->parent->ops->translate(d->parent, fwspec, hwirq, type);
 }
 
 static int msm_mpm_gic_chip_alloc(struct irq_domain *domain,
