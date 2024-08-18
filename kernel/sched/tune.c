@@ -143,7 +143,7 @@ struct boost_groups {
 	raw_spinlock_t lock;
 	/* Work structs for updating CPU util */
 	struct workqueue_struct *wq;
-	struct work_struct cpu_work;
+	struct work_struct cpu_work, cpu_work_dl;
 };
 
 /* Boost groups affecting each CPU in the system */
@@ -235,6 +235,17 @@ schedtune_input_timeout(int idx, struct boost_groups* bg, u64 now)
 	return false;
 }
 
+static inline bool 
+schedtune_input_timeout_update(int idx, struct boost_groups* bg, u64 now)
+{
+	bool ret = schedtune_input_timeout(idx, bg, now);
+
+	if (ret || bg->group[idx].boost > 0)
+		bg->group[idx].input_ts = now;
+
+	return ret;
+}
+
 static inline bool
 schedtune_boost_group_active(int idx, struct boost_groups* bg, u64 now)
 {
@@ -283,16 +294,28 @@ schedtune_cpu_update(int cpu, u64 now)
 	bg->boost_ts = boost_ts;
 }
 
-static void
-schedtune_boostgroup_update_cpu(struct work_struct *work)
+static inline void
+schedtune_cpufreq_update_util(unsigned int flags)
 {
 	struct rq *rq = this_rq();
 	struct rq_flags rf;
 
 	rq_lock_irqsave(rq, &rf);
 	update_rq_clock(rq);
-	cpufreq_update_util(rq, 0);
+	cpufreq_update_util(rq, flags);
 	rq_unlock_irqrestore(rq, &rf);
+}
+
+static void
+schedtune_boostgroup_update_cpu(struct work_struct *work)
+{
+	schedtune_cpufreq_update_util(0);
+}
+
+static void
+schedtune_boostgroup_update_cpu_dl(struct work_struct *work)
+{
+	schedtune_cpufreq_update_util(SCHED_CPUFREQ_DL);
 }
 
 static int
@@ -301,6 +324,7 @@ schedtune_boostgroup_update(int idx, int boost)
 	struct boost_groups *bg;
 	int cur_boost_max;
 	int old_boost;
+	bool timeout;
 	int cpu;
 	u64 now;
 
@@ -319,15 +343,17 @@ schedtune_boostgroup_update(int idx, int boost)
 
 		/* Update the boost value of this boost group */
 		bg->group[idx].boost = boost;
-		if (boost > 0)
-			bg->group[idx].input_ts = now;
+		timeout = schedtune_input_timeout_update(idx, bg, now);
 
 		/* Check if this update increase current max */
 		if (boost > cur_boost_max &&
 			schedtune_boost_group_active(idx, bg, now)) {
 			bg->boost_max = boost;
 			bg->boost_ts = bg->group[idx].ts;
-			queue_work_on(cpu, bg->wq, &bg->cpu_work);
+			if (!timeout)
+				queue_work_on(cpu, bg->wq, &bg->cpu_work);
+			else
+				queue_work_on(cpu, bg->wq, &bg->cpu_work_dl);
 
 			trace_sched_tune_boostgroup_update(cpu, 1, bg->boost_max);
 			continue;
@@ -829,6 +855,8 @@ schedtune_init_cgroups(void)
 		bg->wq = wq;
 		INIT_WORK(&bg->cpu_work, 
 				schedtune_boostgroup_update_cpu);
+		INIT_WORK(&bg->cpu_work_dl, 
+				schedtune_boostgroup_update_cpu_dl);
 	}
 
 	pr_info("schedtune: configured to support %d boost groups\n",
