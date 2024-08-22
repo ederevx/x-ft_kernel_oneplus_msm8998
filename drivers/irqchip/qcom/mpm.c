@@ -486,7 +486,6 @@ static int msm_get_apps_irq(unsigned int mpm_irq)
 static void system_pm_exit_sleep(bool success)
 {
 	msm_rpm_exit_sleep();
-	msm_mpm_set_wake_irqs(false);
 }
 
 static u64 us_to_ticks(uint64_t sleep_val)
@@ -598,6 +597,10 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 
 		msm_mpm_write(MPM_REG_STATUS, i, 0);
 	}
+
+	/* Return to enable IRQs after setting pending IRQs */
+	msm_mpm_set_wake_irqs(false);
+
 	return IRQ_HANDLED;
 }
 
