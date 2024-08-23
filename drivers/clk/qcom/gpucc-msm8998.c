@@ -356,93 +356,6 @@ static struct mux_clk gpucc_gcc_dbg_clk = {
 };
 #endif
 
-static void enable_gfx_crc(void __iomem *base)
-{
-	u32 regval;
-
-	clk_set_rate(gpucc_gfx3d_clk.clkr.hw.clk, 
-			ftbl_gfx3d_clk_src[VDD_GFX_LOW_SVS].freq);
-
-	/* Turn on the GPU_CX GDSC */
-	regval = readl_relaxed(base + GPU_CX_GDSCR_OFFSET);
-	regval &= ~SW_COLLAPSE_MASK;
-	writel_relaxed(regval, base + GPU_CX_GDSCR_OFFSET);
-
-	/* Wait for 10usecs to let the GDSC turn ON */
-	mb();
-	udelay(10);
-
-	/* Turn on the Graphics rail */
-	if (regulator_enable(vdd_gpucc.regulator[0]))
-		pr_warn("Failed to enable VDD_GPUCC during CRC sequence!\n");
-	/* Turn on the GPU_GX GDSC */
-	writel_relaxed(0x1, base + GPU_GX_BCR_OFFSET);
-
-	/*
-	 * BLK_ARES should be kept asserted for 1us before being de-asserted.
-	 */
-	wmb();
-	udelay(1);
-	writel_relaxed(0x0, base + GPU_GX_BCR_OFFSET);
-	regval = readl_relaxed(base + 0x130);
-	regval |= BIT(4);
-	writel_relaxed(regval, base + 0x130);
-
-	/* Keep reset asserted for at-least 1us before continuing. */
-	wmb();
-	udelay(1);
-	regval &= ~BIT(4);
-	writel_relaxed(regval, base + 0x130);
-
-	/* Make sure GMEM_RESET is de-asserted before continuing. */
-	wmb();
-	regval &= ~BIT(0);
-	writel_relaxed(regval, base + 0x130);
-
-	/* All previous writes should be done at this point */
-	wmb();
-	regval = readl_relaxed(base + GPU_GX_GDSCR_OFFSET);
-	regval &= ~SW_COLLAPSE_MASK;
-	writel_relaxed(regval, base + GPU_GX_GDSCR_OFFSET);
-
-	/* Wait for 10usecs to let the GDSC turn ON */
-	mb();
-	udelay(10);
-
-	/* Enable the graphics clock */
-	clk_prepare_enable(gpucc_gfx3d_clk.clkr.hw.clk);
-
-	/* Enabling MND RC in Bypass mode */
-	writel_relaxed(0x00015010, base + CRC_MND_CFG_OFFSET);
-	writel_relaxed(0x00800000, base + CRC_SID_FSM_OFFSET);
-
-	/* Wait for 16 cycles before continuing */
-	udelay(1);
-	clk_set_rate(gpucc_gfx3d_clk.clkr.hw.clk, 
-			ftbl_gfx3d_clk_src[VDD_GFX_TURBO_L1].freq);
-
-	/* Disable the graphics clock */
-	clk_disable_unprepare(gpucc_gfx3d_clk.clkr.hw.clk);
-
-	/* Turn off the gpu_cx and gpu_gx GDSCs */
-	regval = readl_relaxed(base + GPU_GX_GDSCR_OFFSET);
-	regval |= SW_COLLAPSE_MASK;
-	writel_relaxed(regval, base + GPU_GX_GDSCR_OFFSET);
-
-	/* Write to disable GX GDSC should go through before continuing */
-	wmb();
-	regval = readl_relaxed(base + 0x130);
-	regval |= BIT(0);
-	writel_relaxed(regval, base + 0x130);
-
-	/* Make sure GMEM_CLAMP_IO is asserted before continuing. */
-	wmb();
-	regulator_disable(vdd_gpucc.regulator[0]);
-	regval = readl_relaxed(base + GPU_CX_GDSCR_OFFSET);
-	regval |= SW_COLLAPSE_MASK;
-	writel_relaxed(regval, base + GPU_CX_GDSCR_OFFSET);
-}
-
 /*
 static struct mux_clk gfxcc_dbg_clk = {
 	.ops = &mux_reg_ops,
@@ -560,19 +473,21 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 
 	clk_fabia_pll_configure(&gpu_pll0_pll, regmap, &gpu_pll0_config);
 
+	/* Enable GFX CRC by enabling MND RC in Bypass mode */
+	regmap_write_bits(regmap, CRC_MND_CFG_OFFSET, 0x00015010, 0x00015010);
+	regmap_write_bits(regmap, CRC_SID_FSM_OFFSET, 0x00800000, 0x00800000);
+
 	/* Force periph logic on to avoid perf counter corruption */
 	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(13), BIT(13));
 
 	/* Tweak droop detector (GPUCC_GPU_DD_WRAP_CTRL) to reduce leakage */
-	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(0), BIT(0));
+	regmap_write_bits(regmap, 0x430, BIT(0), BIT(0));
 
 	rc = qcom_cc_really_probe(pdev, &gpucc_msm8998_desc, regmap);
 	if (rc) {
 		dev_err(&pdev->dev, "Failed to register GPUCC clocks\n");
 		return rc;
 	}
-
-	enable_gfx_crc(base);
 
 	dev_info(&pdev->dev, "Registered GPUCC clocks\n");
 	return 0;
