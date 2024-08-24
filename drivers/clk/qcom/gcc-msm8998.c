@@ -1348,7 +1348,7 @@ static struct clk_gate2 gpll0_out_msscc = {
 		.hw.init = &(struct clk_init_data) {
 			.name = "gpll0_out_msscc",
 			.parent_names = (const char *[]){
-				"gpll0_ao",
+				"gpll0",
 			},
 			.num_parents = 1,
 			.ops = &clk_gate2_ops,
