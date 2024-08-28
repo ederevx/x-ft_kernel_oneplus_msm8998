@@ -32,6 +32,7 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/cpu_pm.h>
+#include <linux/syscore_ops.h>
 #include <asm/arch_timer.h>
 #include <soc/qcom/rpm-notifier.h>
 #include <soc/qcom/lpm_levels.h>
@@ -50,7 +51,11 @@
 #define MPM_REG_RISING_EDGE 2
 #define MPM_REG_POLARITY 3
 #define MPM_REG_STATUS 4
+#define MPM_REG_NUM 5
 
+#define MAX_IRQS 126
+#define IRQS_PER_REG 32
+#define MAX_REG_WIDTH ((MAX_IRQS/IRQS_PER_REG) + 1)
 #define QCOM_MPM_REG_WIDTH  DIV_ROUND_UP(num_mpm_irqs, 32)
 #define MPM_REGISTER(reg, index) ((reg * QCOM_MPM_REG_WIDTH + index + 2) * (4))
 
@@ -63,6 +68,10 @@ struct msm_mpm_device_data {
 	struct irq_domain *gpio_chip_domain;
 };
 
+struct msm_mpm_stored_regs {
+	uint32_t irqs[MAX_REG_WIDTH];
+};
+
 static int msm_pm_sleep_time_override;
 static int num_mpm_irqs = 64;
 module_param_named(sleep_time_override,
@@ -70,6 +79,7 @@ module_param_named(sleep_time_override,
 static struct msm_mpm_device_data msm_mpm_dev_data;
 static unsigned int *mpm_to_irq;
 static DEFINE_SPINLOCK(mpm_lock);
+static struct msm_mpm_stored_regs mpm_regs[MPM_REG_NUM];
 
 static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
 {
@@ -174,6 +184,7 @@ static void msm_mpm_program_set_type(bool set, unsigned int reg,
 		type = CLEAR_TYPE(type, mask);
 
 	msm_mpm_write(reg, index, type);
+	mpm_regs[reg].irqs[index] = type;
 }
 
 static void msm_mpm_set_type(struct irq_data *d,
@@ -271,7 +282,9 @@ static struct irq_chip msm_mpm_gic_chip = {
 	.irq_unmask	= msm_mpm_gic_chip_unmask,
 	.irq_retrigger	= irq_chip_retrigger_hierarchy,
 	.irq_set_type	= msm_mpm_gic_chip_set_type,
-	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+	.flags			= IRQCHIP_MASK_ON_SUSPEND |
+					IRQCHIP_SET_TYPE_MASKED |
+					IRQCHIP_SKIP_SET_WAKE,
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 	.irq_get_irqchip_state 	= msm_mpm_gic_get_irqchip_state,
 	.irq_set_irqchip_state	= msm_mpm_gic_set_irqchip_state,
@@ -283,7 +296,9 @@ static struct irq_chip msm_mpm_gpio_chip = {
 	.irq_disable	= msm_mpm_gpio_chip_mask,
 	.irq_unmask	= msm_mpm_gpio_chip_unmask,
 	.irq_set_type	= msm_mpm_gpio_chip_set_type,
-	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+	.flags			= IRQCHIP_MASK_ON_SUSPEND |
+					IRQCHIP_SET_TYPE_MASKED |
+					IRQCHIP_SKIP_SET_WAKE,
 	.irq_retrigger          = irq_chip_retrigger_hierarchy,
 };
 
@@ -509,6 +524,46 @@ static struct system_pm_ops pm_ops = {
 	.update_wakeup = system_pm_update_wakeup,
 	.sleep_allowed = system_pm_sleep_allowed,
 };
+
+static int msm_mpm_suspend(void)
+{
+	int i;
+	unsigned int reg;
+
+	reg = MPM_REG_ENABLE;
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++)
+		mpm_regs[reg].irqs[i] = msm_mpm_read(reg, i);
+
+	return 0;
+}
+
+static void msm_mpm_resume(void)
+{
+	void __iomem *mpm_reg_base = msm_mpm_dev_data.mpm_request_reg_base;
+	int i;
+	unsigned int reg;
+
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
+		for (reg = MPM_REG_FALLING_EDGE; reg < MPM_REG_NUM; reg++)
+			msm_mpm_write(reg, i, mpm_regs[reg].irqs[i]);
+
+		reg = MPM_REG_ENABLE;
+		writel_relaxed(mpm_regs[reg].irqs[i],
+				mpm_reg_base + MPM_REGISTER(reg, i));
+	}
+}
+
+static struct syscore_ops msm_mpm_syscore_ops = {
+	.suspend = msm_mpm_suspend,
+	.resume = msm_mpm_resume,
+};
+
+static int __init msm_mpm_init_syscore(void)
+{
+	register_syscore_ops(&msm_mpm_syscore_ops);
+	return 0;
+}
+arch_initcall(msm_mpm_init_syscore);
 
 /*
  * Triggered by RPM when system resumes from deep sleep
