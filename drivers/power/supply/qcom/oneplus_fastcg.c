@@ -605,6 +605,7 @@ void switch_mode_to_normal(void)
 {
 	usb_sw_gpio_set(0);
 	mcu_en_gpio_set(1);
+	msm_cpuidle_set_sleep_disable(false);
 }
 
 static void update_fast_chg_started(void)
@@ -936,6 +937,7 @@ static long  dash_dev_ioctl(struct file *filp, unsigned int cmd,
 				notify_check_usb_suspend(false, false);
 				dash_write(di, ALLOW_DATA);
 				di->fast_chg_started = true;
+				msm_cpuidle_set_sleep_disable(true);
 			}
 			break;
 		case DASH_NOTIFY_FAST_ABSENT:
