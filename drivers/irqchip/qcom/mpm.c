@@ -544,7 +544,7 @@ static void msm_mpm_resume(void)
 	unsigned int reg;
 
 	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
-		for (reg = MPM_REG_FALLING_EDGE; reg < MPM_REG_NUM; reg++)
+		for (reg = MPM_REG_FALLING_EDGE; reg <= MPM_REG_POLARITY; reg++)
 			msm_mpm_write(reg, i, mpm_regs[reg].irqs[i]);
 
 		reg = MPM_REG_ENABLE;
