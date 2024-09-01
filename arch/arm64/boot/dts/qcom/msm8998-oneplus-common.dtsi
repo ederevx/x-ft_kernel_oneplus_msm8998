@@ -248,6 +248,7 @@
 	qcom,wave-samp-rep-cnt = <1>;
 	qcom,use-play-irq;
 	qcom,wave-play-rate-us = <4255>;
+	qcom,vmax-mv = <1800>;
 	qcom,lra-auto-res-mode = "qwd";
 	qcom,lra-res-cal-period = <32>;
 	qcom,lra-auto-mode;
