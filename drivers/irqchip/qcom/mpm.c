@@ -51,7 +51,8 @@
 #define MPM_REG_RISING_EDGE 2
 #define MPM_REG_POLARITY 3
 #define MPM_REG_STATUS 4
-#define MPM_REG_NUM 5
+#define MPM_REG_SW_WAKE 5
+#define MPM_REG_NUM 6
 
 #define MAX_IRQS 126
 #define IRQS_PER_REG 32
@@ -226,6 +227,36 @@ static void msm_mpm_set_type(struct irq_data *d,
 	}
 }
 
+static inline void msm_mpm_set_wake(struct irq_data *d, bool on)
+{
+	int mpm_pin[MAX_MPM_PIN_PER_IRQ] = {-1, -1};
+	unsigned long flags;
+	int i = 0;
+	u32 wake;
+	unsigned int index, mask;
+	unsigned int reg;
+
+	reg = MPM_REG_SW_WAKE;
+	msm_get_mpm_pin(d, mpm_pin);
+	for (i = 0; i < MAX_MPM_PIN_PER_IRQ; i++) {
+		if (mpm_pin[i] < 0)
+			return;
+
+		index = mpm_pin[i]/32;
+		mask = mpm_pin[i]%32;
+		spin_lock_irqsave(&mpm_lock, flags);
+		wake = mpm_regs[reg].irqs[index];
+
+		if (on)
+			wake = ENABLE_INTR(wake, mask);
+		else
+			wake = CLEAR_INTR(wake, mask);
+
+		mpm_regs[reg].irqs[index] = wake;
+		spin_unlock_irqrestore(&mpm_lock, flags);
+	}
+}
+
 static void msm_mpm_gpio_chip_mask(struct irq_data *d)
 {
 	msm_mpm_enable_irq(d, false);
@@ -239,6 +270,12 @@ static void msm_mpm_gpio_chip_unmask(struct irq_data *d)
 static int msm_mpm_gpio_chip_set_type(struct irq_data *d, unsigned int type)
 {
 	msm_mpm_set_type(d, type);
+	return 0;
+}
+
+static int msm_mpm_gpio_chip_set_wake(struct irq_data *d, unsigned int on)
+{
+	msm_mpm_set_wake(d, on);
 	return 0;
 }
 
@@ -258,6 +295,12 @@ static int msm_mpm_gic_chip_set_type(struct irq_data *d, unsigned int type)
 {
 	msm_mpm_set_type(d, type);
 	return irq_chip_set_type_parent(d, type);
+}
+
+static int msm_mpm_gic_chip_set_wake(struct irq_data *d, unsigned int on)
+{
+	msm_mpm_set_wake(d, on);
+	return irq_chip_set_wake_parent(d, on);
 }
 
 static int msm_mpm_gic_get_irqchip_state(struct irq_data *d,
@@ -282,9 +325,9 @@ static struct irq_chip msm_mpm_gic_chip = {
 	.irq_unmask	= msm_mpm_gic_chip_unmask,
 	.irq_retrigger	= irq_chip_retrigger_hierarchy,
 	.irq_set_type	= msm_mpm_gic_chip_set_type,
+	.irq_set_wake	= msm_mpm_gic_chip_set_wake,
 	.flags			= IRQCHIP_MASK_ON_SUSPEND |
-					IRQCHIP_SET_TYPE_MASKED |
-					IRQCHIP_SKIP_SET_WAKE,
+					IRQCHIP_SET_TYPE_MASKED,
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 	.irq_get_irqchip_state 	= msm_mpm_gic_get_irqchip_state,
 	.irq_set_irqchip_state	= msm_mpm_gic_set_irqchip_state,
@@ -296,9 +339,9 @@ static struct irq_chip msm_mpm_gpio_chip = {
 	.irq_disable	= msm_mpm_gpio_chip_mask,
 	.irq_unmask	= msm_mpm_gpio_chip_unmask,
 	.irq_set_type	= msm_mpm_gpio_chip_set_type,
+	.irq_set_wake	= msm_mpm_gpio_chip_set_wake,
 	.flags			= IRQCHIP_MASK_ON_SUSPEND |
-					IRQCHIP_SET_TYPE_MASKED |
-					IRQCHIP_SKIP_SET_WAKE,
+					IRQCHIP_SET_TYPE_MASKED,
 	.irq_retrigger          = irq_chip_retrigger_hierarchy,
 };
 
@@ -527,12 +570,16 @@ static struct system_pm_ops pm_ops = {
 
 static int msm_mpm_suspend(void)
 {
+	void __iomem *mpm_reg_base = msm_mpm_dev_data.mpm_request_reg_base;
 	int i;
 	unsigned int reg;
 
 	reg = MPM_REG_ENABLE;
-	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++)
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
 		mpm_regs[reg].irqs[i] = msm_mpm_read(reg, i);
+		writel_relaxed(mpm_regs[MPM_REG_SW_WAKE].irqs[i],
+				mpm_reg_base + MPM_REGISTER(reg, i));
+	}
 
 	return 0;
 }
