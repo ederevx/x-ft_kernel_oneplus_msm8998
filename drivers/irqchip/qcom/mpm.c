@@ -649,6 +649,19 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void msm_mpm_regs_init(void)
+{
+	int i;
+	unsigned int reg;
+
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
+		for (reg = 0; reg < MPM_REG_NUM; reg++) {
+			msm_mpm_write(reg, i, 0);
+			mpm_regs[reg].irqs[i] = 0;
+		}
+	}
+}
+
 static int msm_mpm_init(struct device_node *node)
 {
 	struct msm_mpm_device_data *dev = &msm_mpm_dev_data;
@@ -667,6 +680,8 @@ static int msm_mpm_init(struct device_node *node)
 		ret = -EADDRNOTAVAIL;
 		goto reg_base_err;
 	}
+
+	msm_mpm_regs_init();
 
 	index = of_property_match_string(node, "reg-names", "ipc");
 	if (index < 0) {
