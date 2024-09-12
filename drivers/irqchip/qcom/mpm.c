@@ -620,10 +620,10 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 	int i, k, apps_irq;
 	unsigned int mpm_irq;
 	struct irq_desc *desc = NULL;
-	unsigned int reg = MPM_REG_ENABLE;
+	unsigned int reg = MPM_REG_SW_WAKE;
 
 	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
-		value[i] = msm_mpm_read(reg, i);
+		value[i] = mpm_regs[reg].irqs[i];
 		trace_mpm_wakeup_enable_irqs(i, value[i]);
 	}
 
