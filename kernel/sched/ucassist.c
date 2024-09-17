@@ -55,7 +55,6 @@ static struct ucassist_struct ucassist_data[] = {
 			.enabled = true,
 			.duration_ms = 5000,
 			.enable = { "max", "78", 1, 0 },
-			.disable = { "max", "10", 1, 0 },
 		},
 	},
 	[1] = {
@@ -90,18 +89,13 @@ static void ucassist_set_uclamp_data(struct cgroup_subsys_state *css,
 				cdata.latency_sensitive);
 }
 
-static DEFINE_SPINLOCK(ucassist_data_lock);
-
 static void ucassist_disable_input_data(struct work_struct *work)
 {
 	struct ucassist_struct *uc = container_of(work, 
 			struct ucassist_struct,
 			input.dwork.work);
 
-	if (spin_trylock(&ucassist_data_lock)) {
-		ucassist_set_uclamp_data(uc->css, uc->input.disable);
-		spin_unlock(&ucassist_data_lock);
-	}
+	ucassist_set_uclamp_data(uc->css, uc->init);
 }
 
 static void ucassist_enable_input_data(struct work_struct *work)
@@ -110,19 +104,23 @@ static void ucassist_enable_input_data(struct work_struct *work)
 			struct ucassist_struct,
 			input.ework);
 
-	spin_lock(&ucassist_data_lock);
+	if (mod_delayed_work(ucassist_wq, &uc->input.dwork,
+			msecs_to_jiffies(uc->input.duration_ms)))
+		return;
+
+	pr_info("set input values for %s", uc->name);
+
 	ucassist_set_uclamp_data(uc->css, uc->input.enable);
-	spin_unlock(&ucassist_data_lock);
 }
 
 static void ucassist_event(struct input_handle *handle,
 		unsigned int type, unsigned int code, int value)
 {
-	static DEFINE_SPINLOCK(ucassist_event_lock);
+	static atomic_t ucassist_event_lock = ATOMIC_INIT(0);
 	struct ucassist_struct *uc;
 	int i;
 
-	if (!spin_trylock(&ucassist_event_lock))
+	if (atomic_cmpxchg_acquire(&ucassist_event_lock, 0, 1))
 		return;
 
 	for (i = 0; i < ARRAY_SIZE(ucassist_data); i++) {
@@ -134,14 +132,10 @@ static void ucassist_event(struct input_handle *handle,
 		if (!uc->input.enabled)
 			continue;
 
-		if (mod_delayed_work(ucassist_wq, &uc->input.dwork,
-				msecs_to_jiffies(uc->input.duration_ms)))
-			continue;
-
 		queue_work(ucassist_wq, &uc->input.ework);
 	}
 
-	spin_unlock(&ucassist_event_lock);
+	atomic_set_release(&ucassist_event_lock, 0);
 }
 
 static int ucassist_connect(struct input_handler *handler,
