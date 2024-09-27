@@ -2254,7 +2254,18 @@ cpu_util_freq(int cpu, struct sched_walt_cpu_load *walt_load)
 static inline unsigned long
 cpu_util_freq(int cpu, struct sched_walt_cpu_load *walt_load)
 {
-	return cpu_util(cpu);
+	unsigned long util = cpu_util(cpu);
+	unsigned long runnable;
+
+	/*
+	* Boosted CPU utilization is defined as max(CPU runnable, CPU utilization).
+	* CPU contention for CFS tasks can be detected by CPU runnable > CPU
+	* utilization.
+	*/
+	runnable = READ_ONCE(cpu_rq(cpu)->cfs.avg.runnable_load_avg);
+	util = max(runnable, util);
+
+	return util;
 }
 
 #define sched_ravg_window TICK_NSEC
