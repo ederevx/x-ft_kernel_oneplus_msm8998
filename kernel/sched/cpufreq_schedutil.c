@@ -233,6 +233,8 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu)
 	*max = cfs_max;
 
 	*util = boosted_cpu_util(cpu, &loadcpu->walt_load);
+	if (likely(use_pelt()))
+		*util = min(*util + cpu_util_rt(rq), *max);
 
 #ifdef CONFIG_UCLAMP_TASK
    	*util = uclamp_rq_util_with(rq, *util, NULL);
