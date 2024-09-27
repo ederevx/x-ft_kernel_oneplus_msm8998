@@ -6156,9 +6156,10 @@ static unsigned long group_max_util(struct energy_env *eenv, int cpu_idx)
 
 		/*
 		 * Apply CPU uclamp to possible targets max_util with task 
-		 * uclamp considered.
+		 * uclamp considered at dst_cpu or target cpu.
 		 */
-		util = uclamp_rq_util_with(cpu_rq(cpu), util, eenv->p);
+		util = uclamp_rq_util_with(cpu_rq(cpu), util, 
+				cpu == eenv->cpu[cpu_idx].cpu_id ? eenv->p : NULL);
 
 		max_util = max(max_util, util);
 	}
