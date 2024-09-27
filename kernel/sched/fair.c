@@ -7460,6 +7460,15 @@ static inline bool task_fits_capacity(struct task_struct *p,
 	else
 		margin = sched_capacity_margin_up[task_cpu(p)];
 
+#ifdef CONFIG_UCLAMP_TASK_GROUP
+	if (!uclamp_rq_is_idle(cpu_rq(cpu))) {
+		unsigned long util = task_util_est(p);
+
+		util = uclamp_rq_util_with(cpu_rq(cpu), util, p);
+		return capacity * 1024 > util * margin;
+	}
+#endif
+
 	return capacity * 1024 > boosted_task_util(p) * margin;
 }
 
