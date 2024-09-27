@@ -225,24 +225,13 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu,
 			   u64 time)
 {
 	struct rq *rq = cpu_rq(cpu);
-	unsigned long max_cap, rt;
 	struct sugov_cpu *loadcpu = &per_cpu(sugov_cpu, cpu);
-	s64 delta;
 
-	max_cap = arch_scale_cpu_capacity(NULL, cpu);
-	*max = max_cap;
+	*max = arch_scale_cpu_capacity(NULL, cpu);
 
 	*util = boosted_cpu_util(cpu, &loadcpu->walt_load);
-
-	if (likely(use_pelt())) {
-		sched_avg_update(rq);
-		delta = time - rq->age_stamp;
-		if (unlikely(delta < 0))
-			delta = 0;
-		rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
-		rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
-		*util = min(*util + rt, max_cap);
-	}
+	if (likely(use_pelt()))
+		*util = min(*util + cpu_util_rt(rq), *max);
 
 #ifdef CONFIG_UCLAMP_TASK
    	*util = uclamp_rq_util_with(rq, *util, NULL);
