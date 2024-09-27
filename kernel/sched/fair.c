@@ -6136,6 +6136,7 @@ static unsigned long group_max_util(struct energy_env *eenv, int cpu_idx)
 {
 	unsigned long max_util = 0;
 	unsigned long util;
+	unsigned long runnable;
 	int cpu;
 
 	for_each_cpu(cpu, sched_group_span(eenv->sg_cap)) {
@@ -6148,6 +6149,16 @@ static unsigned long group_max_util(struct energy_env *eenv, int cpu_idx)
 		 */
 		if (unlikely(cpu == eenv->cpu[cpu_idx].cpu_id))
 			util += eenv->util_delta_boosted;
+
+		/* Apply runnable boosting */
+		runnable = READ_ONCE(cpu_rq(cpu)->cfs.avg.runnable_load_avg);
+		util = max(runnable, util);
+
+		/*
+		 * Apply CPU uclamp to possible targets max_util with task 
+		 * uclamp considered.
+		 */
+		util = uclamp_rq_util_with(cpu_rq(cpu), util, eenv->p);
 
 		max_util = max(max_util, util);
 	}
@@ -6181,6 +6192,12 @@ long group_norm_util(struct energy_env *eenv, int cpu_idx)
 		 */
 		if (unlikely(cpu == eenv->cpu[cpu_idx].cpu_id))
 			util += eenv->util_delta;
+
+		/*
+		 * Apply CPU uclamp to possible targets util without task 
+		 * uclamp considered.
+		 */
+		util = uclamp_rq_util_with(cpu_rq(cpu), util, NULL);
 
 		util_sum += __cpu_norm_util(util, capacity);
 	}
