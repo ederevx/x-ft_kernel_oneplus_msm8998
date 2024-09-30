@@ -585,6 +585,11 @@ int schedtune_task_boost(struct task_struct *p)
 	task_boost = st->boost;
 	rcu_read_unlock();
 
+#ifdef CONFIG_UCLAMP_TASK
+	if (!task_boost)
+		task_boost = uclamp_boosted(p);
+#endif
+
 	return task_boost;
 }
 
@@ -603,6 +608,11 @@ int schedtune_task_boost_rcu_locked(struct task_struct *p)
 	st = task_schedtune(p);
 	task_boost = st->boost;
 
+#ifdef CONFIG_UCLAMP_TASK
+	if (!task_boost)
+		task_boost = uclamp_boosted(p);
+#endif
+
 	return task_boost;
 }
 
@@ -619,6 +629,11 @@ int schedtune_prefer_idle(struct task_struct *p)
 	st = task_schedtune(p);
 	prefer_idle = st->prefer_idle;
 	rcu_read_unlock();
+
+#ifdef CONFIG_UCLAMP_TASK_GROUP
+	if (!prefer_idle)
+		prefer_idle = uclamp_latency_sensitive(p);
+#endif
 
 	return prefer_idle;
 }
