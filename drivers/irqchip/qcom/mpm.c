@@ -63,6 +63,18 @@ struct msm_mpm_device_data {
 	struct irq_domain *gpio_chip_domain;
 };
 
+#define MPM_SW_ENABLE 0
+#define MPM_SW_WAKE 1
+#define MPM_SW_NUM 2
+
+#define MAX_IRQS 126
+#define IRQS_PER_REG 32
+#define MAX_REG_WIDTH ((MAX_IRQS/IRQS_PER_REG) + 1)
+
+static struct {
+	uint32_t irqs[MAX_REG_WIDTH];
+} mpm_regs[MPM_SW_NUM];
+
 static int msm_pm_sleep_time_override;
 static int num_mpm_irqs = 64;
 module_param_named(sleep_time_override,
@@ -70,6 +82,7 @@ module_param_named(sleep_time_override,
 static struct msm_mpm_device_data msm_mpm_dev_data;
 static unsigned int *mpm_to_irq;
 static DEFINE_SPINLOCK(mpm_lock);
+static struct cpumask mpm_ipc_cpumask;
 
 static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
 {
@@ -139,9 +152,7 @@ static inline void msm_mpm_enable_irq(struct irq_data *d, bool on)
 	int i = 0;
 	u32 enable;
 	unsigned int index, mask;
-	unsigned int reg;
 
-	reg = MPM_REG_ENABLE;
 	msm_get_mpm_pin(d, mpm_pin);
 	for (i = 0; i < MAX_MPM_PIN_PER_IRQ; i++) {
 		if (mpm_pin[i] < 0)
@@ -150,14 +161,14 @@ static inline void msm_mpm_enable_irq(struct irq_data *d, bool on)
 		index = mpm_pin[i]/32;
 		mask = mpm_pin[i]%32;
 		spin_lock_irqsave(&mpm_lock, flags);
-		enable = msm_mpm_read(reg, index);
+		enable = mpm_regs[MPM_SW_ENABLE].irqs[index];
 
 		if (on)
 			enable = ENABLE_INTR(enable, mask);
 		else
 			enable = CLEAR_INTR(enable, mask);
 
-		msm_mpm_write(reg, index, enable);
+		mpm_regs[MPM_SW_ENABLE].irqs[index] = enable;
 		spin_unlock_irqrestore(&mpm_lock, flags);
 	}
 }
@@ -215,6 +226,34 @@ static void msm_mpm_set_type(struct irq_data *d,
 	}
 }
 
+static inline void msm_mpm_set_wake(struct irq_data *d, bool on)
+{
+	int mpm_pin[MAX_MPM_PIN_PER_IRQ] = {-1, -1};
+	unsigned long flags;
+	int i = 0;
+	u32 wake;
+	unsigned int index, mask;
+
+	msm_get_mpm_pin(d, mpm_pin);
+	for (i = 0; i < MAX_MPM_PIN_PER_IRQ; i++) {
+		if (mpm_pin[i] < 0)
+			return;
+
+		index = mpm_pin[i]/32;
+		mask = mpm_pin[i]%32;
+		spin_lock_irqsave(&mpm_lock, flags);
+		wake = mpm_regs[MPM_SW_WAKE].irqs[index];
+
+		if (on)
+			wake = ENABLE_INTR(wake, mask);
+		else
+			wake = CLEAR_INTR(wake, mask);
+
+		mpm_regs[MPM_SW_WAKE].irqs[index] = wake;
+		spin_unlock_irqrestore(&mpm_lock, flags);
+	}
+}
+
 static void msm_mpm_gpio_chip_mask(struct irq_data *d)
 {
 	msm_mpm_enable_irq(d, false);
@@ -228,6 +267,12 @@ static void msm_mpm_gpio_chip_unmask(struct irq_data *d)
 static int msm_mpm_gpio_chip_set_type(struct irq_data *d, unsigned int type)
 {
 	msm_mpm_set_type(d, type);
+	return 0;
+}
+
+static int msm_mpm_gpio_chip_set_wake(struct irq_data *d, unsigned int on)
+{
+	msm_mpm_set_wake(d, on);
 	return 0;
 }
 
@@ -247,6 +292,12 @@ static int msm_mpm_gic_chip_set_type(struct irq_data *d, unsigned int type)
 {
 	msm_mpm_set_type(d, type);
 	return irq_chip_set_type_parent(d, type);
+}
+
+static int msm_mpm_gic_chip_set_wake(struct irq_data *d, unsigned int on)
+{
+	msm_mpm_set_wake(d, on);
+	return irq_chip_set_wake_parent(d, on);
 }
 
 static int msm_mpm_gic_get_irqchip_state(struct irq_data *d,
@@ -271,7 +322,7 @@ static struct irq_chip msm_mpm_gic_chip = {
 	.irq_unmask	= msm_mpm_gic_chip_unmask,
 	.irq_retrigger	= irq_chip_retrigger_hierarchy,
 	.irq_set_type	= msm_mpm_gic_chip_set_type,
-	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+	.irq_set_wake	= msm_mpm_gic_chip_set_wake,
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 	.irq_get_irqchip_state 	= msm_mpm_gic_get_irqchip_state,
 	.irq_set_irqchip_state	= msm_mpm_gic_set_irqchip_state,
@@ -283,7 +334,7 @@ static struct irq_chip msm_mpm_gpio_chip = {
 	.irq_disable	= msm_mpm_gpio_chip_mask,
 	.irq_unmask	= msm_mpm_gpio_chip_unmask,
 	.irq_set_type	= msm_mpm_gpio_chip_set_type,
-	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+	.irq_set_wake	= msm_mpm_gpio_chip_set_wake,
 	.irq_retrigger          = irq_chip_retrigger_hierarchy,
 };
 
@@ -404,6 +455,27 @@ static inline void msm_mpm_send_interrupt(void)
 	wmb();
 }
 
+static inline void msm_mpm_update_reg_enable(bool set_wake)
+{
+	unsigned long flags;
+	int i;
+	u32 enable;
+	unsigned int reg;
+
+	reg = MPM_REG_ENABLE;
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
+		spin_lock_irqsave(&mpm_lock, flags);
+		/* Only track wake IRQs at suspend */
+		if (set_wake)
+			enable = mpm_regs[MPM_SW_WAKE].irqs[i];
+		else
+			enable = mpm_regs[MPM_SW_ENABLE].irqs[i];
+
+		msm_mpm_write(reg, i, enable);
+		spin_unlock_irqrestore(&mpm_lock, flags);
+	}
+}
+
 static inline void msm_mpm_timer_write(uint32_t *expiry)
 {
 	writel_relaxed(expiry[0], msm_mpm_dev_data.mpm_request_reg_base);
@@ -483,6 +555,10 @@ static int system_pm_update_wakeup(bool from_idle)
 
 	msm_mpm_timer_write((uint32_t *)&wakeup);
 	trace_mpm_wakeup_time(from_idle, wakeup, arch_counter_get_cntvct());
+	msm_mpm_update_reg_enable(!from_idle);
+
+	/* Flush vMPM to MPM HW after updating enable IRQs */
+	msm_mpm_enter_sleep(&mpm_ipc_cpumask);
 
 	return 0;
 }
@@ -494,7 +570,7 @@ static int system_pm_enter_sleep(struct cpumask *mask)
 	ret = msm_rpm_enter_sleep(0, mask);
 	if (ret)
 		return ret;
-	msm_mpm_enter_sleep(mask);
+	cpumask_copy(&mpm_ipc_cpumask, mask);
 	return ret;
 }
 
