@@ -331,7 +331,6 @@ static struct irq_chip msm_mpm_gic_chip = {
 static struct irq_chip msm_mpm_gpio_chip = {
 	.name		= "mpm-gpio",
 	.irq_mask	= msm_mpm_gpio_chip_mask,
-	.irq_disable	= msm_mpm_gpio_chip_mask,
 	.irq_unmask	= msm_mpm_gpio_chip_unmask,
 	.irq_set_type	= msm_mpm_gpio_chip_set_type,
 	.irq_set_wake	= msm_mpm_gpio_chip_set_wake,
