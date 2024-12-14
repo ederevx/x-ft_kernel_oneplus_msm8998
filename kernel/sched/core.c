@@ -1008,7 +1008,7 @@ uclamp_eff_get(struct task_struct *p, enum uclamp_id clamp_id)
 	return uc_req;
 }
 
-unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id)
+static inline unsigned long __uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id)
 {
 	struct uclamp_se uc_eff;
 
@@ -1019,6 +1019,16 @@ unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id)
 	uc_eff = uclamp_eff_get(p, clamp_id);
 
 	return (unsigned long)uc_eff.value;
+}
+
+unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id)
+{
+	unsigned long val = __uclamp_eff_value(p, clamp_id);
+
+	/* Scale UCLAMP values when sleeping */
+	ucassist_sleep_uclamp_scaling(&val);
+
+	return val;
 }
 
 /*
@@ -1226,6 +1236,8 @@ uclamp_update_active(struct task_struct *p)
 }
 
 #ifdef CONFIG_UCLAMP_TASK_GROUP
+void ucassist_input_trigger_ext(unsigned long timeout_ms);
+
 static inline void
 uclamp_update_active_tasks(struct cgroup_subsys_state *css)
 {
@@ -1236,6 +1248,9 @@ uclamp_update_active_tasks(struct cgroup_subsys_state *css)
 	while ((p = css_task_iter_next(&it)))
 		uclamp_update_active(p);
 	css_task_iter_end(&it);
+
+	/* Trigger UCASSIST whenever we update UCLAMP */
+	ucassist_input_trigger_ext(1000);
 }
 
 static void cpu_util_update_eff(struct cgroup_subsys_state *css);
