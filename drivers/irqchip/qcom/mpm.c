@@ -489,11 +489,15 @@ static int system_pm_update_wakeup(bool from_idle)
 
 static int system_pm_enter_sleep(struct cpumask *mask)
 {
-	int ret = 0;
+	int ret = 0, i = 0;
 
 	ret = msm_rpm_enter_sleep(0, mask);
 	if (ret)
 		return ret;
+
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++)
+		msm_mpm_write(MPM_REG_STATUS, i, 0);
+
 	msm_mpm_enter_sleep(mask);
 	return ret;
 }
@@ -544,7 +548,6 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 
 		}
 
-		msm_mpm_write(MPM_REG_STATUS, i, 0);
 	}
 	return IRQ_HANDLED;
 }
