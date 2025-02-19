@@ -184,6 +184,15 @@
 		};
 	};
 
+	/* Configure BCL SOC threshold */
+	soc {
+		trips {
+			low-soc {
+				temperature = <5>;
+			};
+		};
+	};
+
 	pa-therm0-adc {
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
