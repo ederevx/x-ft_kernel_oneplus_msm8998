@@ -41,6 +41,7 @@
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
+#include <linux/suspend.h>
 #include <linux/regulator/consumer.h>
 
 #include <linux/input.h>
@@ -533,6 +534,9 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 {
 	struct fpc1020_data *fpc1020 = handle;
 
+	__pm_wakeup_event(&fpc1020->ttw_wl, msecs_to_jiffies(FPC_TTW_HOLD_TIME));
+	pm_system_wakeup();
+
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
 
 	reinit_completion(&fpc1020->irq_sent);
@@ -540,8 +544,6 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 
 	if (fpc1020->screen_state)
 		return IRQ_HANDLED;
-
-	__pm_wakeup_event(&fpc1020->ttw_wl, msecs_to_jiffies(FPC_TTW_HOLD_TIME));
 
 	/* Report button input to trigger CPU boost */
 	input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 1);
