@@ -3244,8 +3244,6 @@ static int gcc_msm8998_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	clk_set_flags(gcc_gpu_bimc_gfx_clk.clkr.hw.clk, CLKFLAG_RETAIN_MEM);
-
 	dev_info(&pdev->dev, "Registered GCC clocks\n");
 	return 0;
 }
