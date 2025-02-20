@@ -1115,7 +1115,6 @@ static int smb2_init_dc_psy(struct smb2 *chip)
  *************************/
 
 static enum power_supply_property smb2_batt_props[] = {
-	POWER_SUPPLY_PROP_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_INPUT_SUSPEND,
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
