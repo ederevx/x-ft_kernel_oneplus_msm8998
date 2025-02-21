@@ -3130,6 +3130,8 @@ static const struct qcom_cc_desc gcc_msm8998_desc = {
 	.num_clks = ARRAY_SIZE(gcc_msm8998_clocks),
 	.resets = gcc_msm8998_resets,
 	.num_resets = ARRAY_SIZE(gcc_msm8998_resets),
+	.hwclks = gcc_msm8998_hws,
+	.num_hwclks = ARRAY_SIZE(gcc_msm8998_hws),
 };
 
 static struct of_device_id gcc_msm8998_match_table[] = {
@@ -3169,7 +3171,7 @@ static int gcc_msm8998_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
 	struct regmap *regmap;
-	int i, socrev, ret = 0;
+	int socrev, ret = 0;
 
 	match = of_match_node(gcc_msm8998_match_table, pdev->dev.of_node);
 	if (match) {
@@ -3203,16 +3205,6 @@ static int gcc_msm8998_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev,
 					"Unable to get vdd_dig_ao regulator\n");
 		return PTR_ERR(vdd_dig_ao.regulator[0]);
-	}
-
-	/* Register the hws */
-	for (i = 0; i < ARRAY_SIZE(gcc_msm8998_hws); i++) {
-		if (!gcc_msm8998_hws[i])
-			continue;
-
-		ret = devm_clk_hw_register(&pdev->dev, gcc_msm8998_hws[i]);
-		if (ret)
-			return ret;
 	}
 
 	/*

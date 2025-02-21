@@ -440,9 +440,6 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 		return PTR_ERR(vdd_gpucc.regulator[0]);
 	}
 
-	/* Avoid turning on the rail during clock registration */
-	vdd_gpucc.skip_handoff = true;
-
 	vdd_gpucc_mx.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_mx");
 	if (IS_ERR(vdd_gpucc_mx.regulator[0])) {
 		if (PTR_ERR(vdd_gpucc_mx.regulator[0]) != -EPROBE_DEFER)
