@@ -5305,55 +5305,62 @@ static void check_dash_status(struct work_struct *work)
 	/* Disable USBIN collapse */
 	op_set_collapse_fet(g_chg, true);
 
-retry:
-	/* Try to rerun AICL as it may be possible that current 
-	   configuration is incorrect */
-	if (retries) {
-		rc = smblib_masked_write(g_chg, USBIN_AICL_OPTIONS_CFG_REG,
-				USBIN_AICL_RERUN_EN_BIT, USBIN_AICL_RERUN_EN_BIT);
-		if (rc < 0)
-			dev_err(g_chg->dev,
-				"Couldn't configure AICL rc=%d\n", rc);
-		smblib_rerun_aicl(g_chg);
-	}
+	while (1) {
+		/* Try to rerun AICL as it may be possible that current 
+		   configuration is incorrect */
+		if (retries) {
+			if (retries == 1) {
+				rc = smblib_masked_write(g_chg, USBIN_AICL_OPTIONS_CFG_REG,
+						USBIN_AICL_RERUN_EN_BIT, USBIN_AICL_RERUN_EN_BIT);
+				if (rc < 0)
+					dev_err(g_chg->dev,
+						"Couldn't configure AICL rc=%d\n", rc);
+			}
+			smblib_rerun_aicl(g_chg);
+		}
 
-	pr_warn("not charging, will check dash again after %d ms", 
-			DASH_STATUS_WAIT);
+		pr_warn("not charging, will check dash again after %d ms", 
+				DASH_STATUS_WAIT);
 
-	/* Ensure the charger has settled before checking again */
-	msleep(DASH_STATUS_WAIT);
+		/* Ensure the charger has settled before checking again */
+		msleep(DASH_STATUS_WAIT);
 
-	status = get_charging_status();
-	if (status == POWER_SUPPLY_STATUS_NOT_CHARGING) {
-		pr_warn("still not charging");
-		goto not_charging;
-	}
-
-	if (prev_soc != -1) {
-		rc = smblib_get_prop_from_bms(g_chg, 
-				POWER_SUPPLY_PROP_BQ_SOC, &val);
-		if (rc) {
-			/* This should have worked, switch to normal to be safe */
-			pr_warn("failed to get soc");
+		status = get_charging_status();
+		if (status == POWER_SUPPLY_STATUS_NOT_CHARGING) {
+			pr_warn("still not charging");
 			goto not_charging;
 		}
 
-		if (val.intval == prev_soc) {
-			if (retries >= DASH_STATUS_RETRIES) {
-				pr_warn("soc is not increasing");
+		if (prev_soc != -1) {
+			rc = smblib_get_prop_from_bms(g_chg, 
+					POWER_SUPPLY_PROP_BQ_SOC, &val);
+			if (rc) {
+				/* This should have worked, switch to normal to be safe */
+				pr_warn("failed to get soc");
 				goto not_charging;
 			}
-			retries++;
-			goto retry;
+
+			if (val.intval == prev_soc) {
+				if (retries >= DASH_STATUS_RETRIES) {
+					pr_warn("soc is not increasing");
+					goto not_charging;
+				}
+				retries++;
+				continue;
+			}
+
+			if (val.intval < prev_soc) {
+				pr_warn("soc dropped");
+				goto not_charging;
+			}
 		}
 
-		if (val.intval < prev_soc) {
-			pr_warn("soc dropped");
-			goto not_charging;
-		}
+		break;
 	}
 
-	goto charging;
+	pr_info("charging, dash will continue to be present");
+	op_set_collapse_fet(g_chg, false);
+	return;
 
 not_charging:
 	pr_warn("fully switch to normal");
@@ -5370,11 +5377,6 @@ not_charging:
 	op_charging_en(g_chg, true);
 	op_check_battery_temp(g_chg);
 	smblib_rerun_aicl(g_chg);
-	op_set_collapse_fet(g_chg, false);
-	return;
-
-charging:
-	pr_info("charging, dash will continue to be present");
 	op_set_collapse_fet(g_chg, false);
 }
 DECLARE_WORK(check_dash_status_work, check_dash_status);
