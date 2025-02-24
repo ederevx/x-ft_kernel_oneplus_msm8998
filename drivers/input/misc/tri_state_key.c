@@ -82,30 +82,31 @@ static void switch_dev_report_input(struct input_dev **input,
 
 static void switch_dev_work(struct work_struct *work)
 {
-	int retry_count = 0, i, mode;
+	int switch_count, i, mode;
 	bool switch_state[MODE_MAX_NUM];
 
 	/* This will retain current mode if the GPIO state is indeterminate */
 	mode = switch_data->stored_current_mode;
 
-retry:
-	switch_state[MODE_MUTE] = !gpio_get_value(switch_data->key1_gpio);
-	switch_state[MODE_DO_NOT_DISTURB] = !gpio_get_value(switch_data->key2_gpio);
-	switch_state[MODE_NORMAL] = !gpio_get_value(switch_data->key3_gpio);
+	do {
+		switch_state[MODE_MUTE] = !gpio_get_value(switch_data->key1_gpio);
+		switch_state[MODE_DO_NOT_DISTURB] = !gpio_get_value(switch_data->key2_gpio);
+		switch_state[MODE_NORMAL] = !gpio_get_value(switch_data->key3_gpio);
 
-	for (i = MODE_MUTE; i < MODE_MAX_NUM; i++) {
-		if (!switch_state[i])
-			continue;
+		switch_count = 0;
+		for (i = MODE_MUTE; i < MODE_MAX_NUM; i++) {
+			if (!switch_state[i])
+				continue;
 
-		/* Try again if tri-state is transitioning */
-		if (++retry_count > 1) {
-			retry_count = 0;
-			cpu_relax();
-			goto retry;
+			/* Try again if tri-state is transitioning */
+			if (++switch_count > 1) {
+				cpu_relax();
+				break;
+			}
+
+			mode = i;
 		}
-
-		mode = i;
-	}
+	} while (switch_count != 1);
 
 	if (mode == switch_data->stored_current_mode)
 		return;
