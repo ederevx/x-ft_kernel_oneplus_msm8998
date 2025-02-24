@@ -151,11 +151,16 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 	opdata->current_ua = ichg_ua;
 
 	if (increase) {
-		for (i = 0; i < ARRAY_SIZE(op_cg_current_data); i++) {
+		/* Make sure we have the latest APSD bit in case it has been rerun */
+		opdata->apsd_bit = op_get_apsd_bit(chg);
+
+		for (i = ARRAY_SIZE(op_cg_current_data) - 1; i >= 0; i--) {
 			const struct op_cg_current_table *d = &op_cg_current_data[i];
 
-			if (opdata->apsd_bit & d->apsd_bit)
+			if (opdata->apsd_bit & d->apsd_bit) {
 				ceil_ichg_ua = d->max_ichg_ua;
+				break;
+			}
 		}
 		pr_info("ceil_ichg_ua=%d", ceil_ichg_ua);
 
@@ -268,22 +273,28 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 			opdata->uovp_state, opdata->last_uovp_state,
 				opdata->not_uovp_cnt);
 
+	/* Restore charging first if it has been disabled */
 	if (chg->chg_ovp) {
 		op_cg_uovp_restore(opdata);
-	} else {
-		/* Increase the current if not undervolt for @DETECT_CNT iterations */
-		if (opdata->not_uovp_cnt >= DETECT_CNT) {
-			opdata->not_uovp_cnt = 0;
-			if (!opdata->not_uovp_timeout) {
-				ret = op_cg_current_inc_dec(opdata, true);
-				if (ret)
-					opdata->not_uovp_timeout = true;
-			} else {
-				/* Reset timeout and try again next DETECT_CNT */
-				opdata->not_uovp_timeout = false;
-			}
-		}
+		return;
 	}
+
+	if (opdata->not_uovp_cnt < DETECT_CNT)
+		return;
+
+	opdata->not_uovp_cnt = 0;
+
+	if (opdata->not_uovp_timeout) {
+		/* Reset timeout and try again next DETECT_CNT */
+		opdata->not_uovp_timeout = false;
+		return;
+	}
+
+	/* Increase the current if not undervolt for @DETECT_CNT iterations
+	   and we're not in timeout */
+	ret = op_cg_current_inc_dec(opdata, true);
+	if (ret)
+		opdata->not_uovp_timeout = true;
 }
 
 static void op_cg_handle_uovp(struct op_cg_uovp_data *opdata)
