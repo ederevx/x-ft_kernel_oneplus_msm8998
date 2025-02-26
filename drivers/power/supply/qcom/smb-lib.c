@@ -5364,19 +5364,12 @@ static void check_dash_status(struct work_struct *work)
 
 not_charging:
 	pr_warn("fully switch to normal");
-	set_dash_charger_present(false);
 
-	/* 
-	 * Restart charging to ensure that soc doesn't get 
-	 * stuck due to low current after turning off fast charge,
-	 * in cases that the MCU retains its 'semi-disabled' 
-	 * state.
-	 */
-	op_charging_en(g_chg, false);
-	msleep(500);
-	op_charging_en(g_chg, true);
-	op_check_battery_temp(g_chg);
-	smblib_rerun_aicl(g_chg);
+	/* Reset MCU and USB GPIOs */
+	set_usb_switch(g_chg, true);
+	set_usb_switch(g_chg, false);
+
+	set_dash_charger_present(false);
 	op_set_collapse_fet(g_chg, false);
 }
 DECLARE_WORK(check_dash_status_work, check_dash_status);
