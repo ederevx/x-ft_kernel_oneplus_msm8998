@@ -27,6 +27,8 @@
 #define DETECT_CNT             3
 #define VOTE_RETRIES           3
 
+#define TIMEOUT_CNT            5
+
 #define NO_CHARGER_BIT         0
 #define FAST_CHARGER_BITS \
 	(DCP_CHARGER_BIT | FLOAT_CHARGER_BIT | OCP_CHARGER_BIT)
@@ -42,6 +44,8 @@ struct op_cg_uovp_data {
 	int uovp_cnt;
 	int not_uovp_cnt;
 
+	int not_uovp_timeout;
+
 	int vchg_mv;
 	int current_ua;
 
@@ -49,7 +53,6 @@ struct op_cg_uovp_data {
 
 	bool last_uovp_state;
 	bool uovp_state;
-	bool not_uovp_timeout;
 	bool is_overvolt;
 
 	bool initialized;
@@ -221,7 +224,7 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 		opdata->uovp_cnt, opdata->vchg_mv);
 
 	opdata->uovp_state = true;
-	opdata->not_uovp_timeout = false;
+	opdata->not_uovp_timeout = 0;
 
 	if (opdata->not_uovp_cnt)
 		opdata->not_uovp_cnt = 0;
@@ -284,9 +287,9 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 
 	opdata->not_uovp_cnt = 0;
 
-	if (opdata->not_uovp_timeout) {
-		/* Reset timeout and try again next DETECT_CNT */
-		opdata->not_uovp_timeout = false;
+	/* Wait for timeout to be cleared before trying again */
+	if (opdata->not_uovp_timeout > 0) {
+		opdata->not_uovp_timeout--;
 		return;
 	}
 
@@ -294,7 +297,7 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 	   and we're not in timeout */
 	ret = op_cg_current_inc_dec(opdata, true);
 	if (ret)
-		opdata->not_uovp_timeout = true;
+		opdata->not_uovp_timeout = TIMEOUT_CNT;
 }
 
 static void op_cg_handle_uovp(struct op_cg_uovp_data *opdata)
