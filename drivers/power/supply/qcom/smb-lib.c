@@ -332,13 +332,13 @@ static const struct apsd_result smblib_apsd_results[] = {
 	},
 	[HVDCP2] = {
 		.name	= "HVDCP2",
-		.bit	= DCP_CHARGER_BIT,
-		.pst	= POWER_SUPPLY_TYPE_USB_DCP
+		.bit	= DCP_CHARGER_BIT | QC_2P0_BIT,
+		.pst	= POWER_SUPPLY_TYPE_USB_HVDCP
 	},
 	[HVDCP3] = {
 		.name	= "HVDCP3",
-		.bit	= DCP_CHARGER_BIT,
-		.pst	= POWER_SUPPLY_TYPE_USB_DCP,
+		.bit	= DCP_CHARGER_BIT | QC_3P0_BIT,
+		.pst	= POWER_SUPPLY_TYPE_USB_HVDCP_3,
 	},
 };
 
