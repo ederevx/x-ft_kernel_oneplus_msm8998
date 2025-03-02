@@ -3282,7 +3282,7 @@ static int fg_psy_get_property(struct power_supply *psy,
 {
 	struct fg_gen3_chip *chip = power_supply_get_drvdata(psy);
 	struct fg_dev *fg = &chip->fg;
-	int val, rc = 0;
+	int rc = 0;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_CAPACITY:
@@ -3459,13 +3459,6 @@ static int fg_psy_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CC_STEP_SEL:
 		pval->intval = chip->ttf.cc_step.sel;
-		break;
-	case POWER_SUPPLY_PROP_CC_SOC:
-		rc = fg_get_sram_prop(&chip->fg, FG_SRAM_CC_SOC, &val);
-		if (rc < 0) {
-			pr_err("Error in getting CC_SOC, rc=%d\n", rc);
-			return rc;
-		}
 		break;
 	case POWER_SUPPLY_PROP_BQ_SOC:
 		if (chip->use_external_fg && external_fg
@@ -3697,7 +3690,6 @@ static enum power_supply_property fg_psy_props[] = {
 	POWER_SUPPLY_PROP_CC_STEP,
 	POWER_SUPPLY_PROP_CC_STEP_SEL,
 	POWER_SUPPLY_PROP_REMAINING_CAPACITY,
-	POWER_SUPPLY_PROP_CC_SOC,
 	POWER_SUPPLY_PROP_SET_ALLOW_READ_EXTERN_FG_IIC,
 	POWER_SUPPLY_PROP_BQ_SOC,
 	POWER_SUPPLY_PROP_BATTERY_HEALTH,
