@@ -1265,6 +1265,7 @@ static struct clk_rcg2 qspi_ref_clk_src = {
 
 static struct clk_branch gcc_hdmi_clkref_clk = {
 	.halt_reg = 0x88000,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x88000,
 		.enable_mask = BIT(0),
@@ -1277,6 +1278,7 @@ static struct clk_branch gcc_hdmi_clkref_clk = {
 
 static struct clk_branch gcc_pcie_clkref_clk = {
 	.halt_reg = 0x8800C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x8800C,
 		.enable_mask = BIT(0),
@@ -1289,6 +1291,7 @@ static struct clk_branch gcc_pcie_clkref_clk = {
 
 static struct clk_branch gcc_rx1_usb2_clkref_clk = {
 	.halt_reg = 0x88014,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x88014,
 		.enable_mask = BIT(0),
@@ -1301,6 +1304,7 @@ static struct clk_branch gcc_rx1_usb2_clkref_clk = {
 
 static struct clk_branch gcc_ufs_clkref_clk = {
 	.halt_reg = 0x88004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x88004,
 		.enable_mask = BIT(0),
@@ -1313,6 +1317,7 @@ static struct clk_branch gcc_ufs_clkref_clk = {
 
 static struct clk_branch gcc_usb3_clkref_clk = {
 	.halt_reg = 0x88008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x88008,
 		.enable_mask = BIT(0),
@@ -1345,7 +1350,6 @@ static struct clk_branch gcc_aggre1_ufs_axi_clk = {
 
 static struct clk_branch gcc_aggre1_ufs_axi_hw_ctl_clk = {
 	.halt_reg = 0x82028,
-	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x82028,
 		.enable_mask = BIT(0),
@@ -2410,7 +2414,6 @@ static struct clk_branch gcc_ufs_axi_clk = {
 
 static struct clk_branch gcc_ufs_axi_hw_ctl_clk = {
 	.halt_reg = 0x75008,
-	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x75008,
 		.enable_mask = BIT(0),
@@ -2448,7 +2451,6 @@ static struct clk_branch gcc_ufs_ice_core_clk = {
 
 static struct clk_branch gcc_ufs_ice_core_hw_ctl_clk = {
 	.halt_reg = 0x7600C,
-	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x7600C,
 		.enable_mask = BIT(0),
@@ -2486,7 +2488,6 @@ static struct clk_branch gcc_ufs_phy_aux_clk = {
 
 static struct clk_branch gcc_ufs_phy_aux_hw_ctl_clk = {
 	.halt_reg = 0x76040,
-	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x76040,
 		.enable_mask = BIT(0),
@@ -2560,7 +2561,6 @@ static struct clk_branch gcc_ufs_unipro_core_clk = {
 
 static struct clk_branch gcc_ufs_unipro_core_hw_ctl_clk = {
 	.halt_reg = 0x76008,
-	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x76008,
 		.enable_mask = BIT(0),
