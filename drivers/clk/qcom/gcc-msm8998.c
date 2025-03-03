@@ -1232,6 +1232,7 @@ static struct clk_rcg2 hmss_gpll0_clk_src = {
 
 static struct clk_branch gcc_hmss_rbcpr_clk = {
 	.halt_reg = 0x48008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x48008,
 		.enable_mask = BIT(0),
