@@ -1354,6 +1354,7 @@ static struct clk_branch gcc_aggre1_ufs_axi_clk = {
 
 static struct clk_branch gcc_aggre1_ufs_axi_hw_ctl_clk = {
 	.halt_reg = 0x82028,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x82028,
 		.enable_mask = BIT(0),
@@ -1371,6 +1372,7 @@ static struct clk_branch gcc_aggre1_ufs_axi_hw_ctl_clk = {
 
 static struct clk_branch gcc_aggre1_usb3_axi_clk = {
 	.halt_reg = 0x82024,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x82024,
 		.enable_mask = BIT(0),
@@ -1388,6 +1390,7 @@ static struct clk_branch gcc_aggre1_usb3_axi_clk = {
 
 static struct clk_branch gcc_bimc_mss_q6_axi_clk = {
 	.halt_reg = 0x4401C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x4401C,
 		.enable_mask = BIT(0),
@@ -1414,6 +1417,7 @@ static struct clk_branch gcc_blsp1_ahb_clk = {
 
 static struct clk_branch gcc_blsp1_qup1_i2c_apps_clk = {
 	.halt_reg = 0x19008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x19008,
 		.enable_mask = BIT(0),
@@ -1431,6 +1435,7 @@ static struct clk_branch gcc_blsp1_qup1_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup1_spi_apps_clk = {
 	.halt_reg = 0x19004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x19004,
 		.enable_mask = BIT(0),
@@ -1448,6 +1453,7 @@ static struct clk_branch gcc_blsp1_qup1_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup2_i2c_apps_clk = {
 	.halt_reg = 0x1B008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1B008,
 		.enable_mask = BIT(0),
@@ -1465,6 +1471,7 @@ static struct clk_branch gcc_blsp1_qup2_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup2_spi_apps_clk = {
 	.halt_reg = 0x1B004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1B004,
 		.enable_mask = BIT(0),
@@ -1482,6 +1489,7 @@ static struct clk_branch gcc_blsp1_qup2_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup3_i2c_apps_clk = {
 	.halt_reg = 0x1D008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1D008,
 		.enable_mask = BIT(0),
@@ -1499,6 +1507,7 @@ static struct clk_branch gcc_blsp1_qup3_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup3_spi_apps_clk = {
 	.halt_reg = 0x1D004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1D004,
 		.enable_mask = BIT(0),
@@ -1516,6 +1525,7 @@ static struct clk_branch gcc_blsp1_qup3_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup4_i2c_apps_clk = {
 	.halt_reg = 0x1F008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1F008,
 		.enable_mask = BIT(0),
@@ -1533,6 +1543,7 @@ static struct clk_branch gcc_blsp1_qup4_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup4_spi_apps_clk = {
 	.halt_reg = 0x1F004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1F004,
 		.enable_mask = BIT(0),
@@ -1550,6 +1561,7 @@ static struct clk_branch gcc_blsp1_qup4_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup5_i2c_apps_clk = {
 	.halt_reg = 0x21008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x21008,
 		.enable_mask = BIT(0),
@@ -1567,6 +1579,7 @@ static struct clk_branch gcc_blsp1_qup5_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup5_spi_apps_clk = {
 	.halt_reg = 0x21004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x21004,
 		.enable_mask = BIT(0),
@@ -1584,6 +1597,7 @@ static struct clk_branch gcc_blsp1_qup5_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup6_i2c_apps_clk = {
 	.halt_reg = 0x23008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x23008,
 		.enable_mask = BIT(0),
@@ -1601,6 +1615,7 @@ static struct clk_branch gcc_blsp1_qup6_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp1_qup6_spi_apps_clk = {
 	.halt_reg = 0x23004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x23004,
 		.enable_mask = BIT(0),
@@ -1618,6 +1633,7 @@ static struct clk_branch gcc_blsp1_qup6_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp1_uart1_apps_clk = {
 	.halt_reg = 0x1A004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1A004,
 		.enable_mask = BIT(0),
@@ -1635,6 +1651,7 @@ static struct clk_branch gcc_blsp1_uart1_apps_clk = {
 
 static struct clk_branch gcc_blsp1_uart2_apps_clk = {
 	.halt_reg = 0x1C004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1C004,
 		.enable_mask = BIT(0),
@@ -1652,6 +1669,7 @@ static struct clk_branch gcc_blsp1_uart2_apps_clk = {
 
 static struct clk_branch gcc_blsp1_uart3_apps_clk = {
 	.halt_reg = 0x1E004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x1E004,
 		.enable_mask = BIT(0),
@@ -1683,6 +1701,7 @@ static struct clk_branch gcc_blsp2_ahb_clk = {
 
 static struct clk_branch gcc_blsp2_qup1_i2c_apps_clk = {
 	.halt_reg = 0x26008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x26008,
 		.enable_mask = BIT(0),
@@ -1700,6 +1719,7 @@ static struct clk_branch gcc_blsp2_qup1_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup1_spi_apps_clk = {
 	.halt_reg = 0x26004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x26004,
 		.enable_mask = BIT(0),
@@ -1717,6 +1737,7 @@ static struct clk_branch gcc_blsp2_qup1_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup2_i2c_apps_clk = {
 	.halt_reg = 0x28008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x28008,
 		.enable_mask = BIT(0),
@@ -1734,6 +1755,7 @@ static struct clk_branch gcc_blsp2_qup2_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup2_spi_apps_clk = {
 	.halt_reg = 0x28004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x28004,
 		.enable_mask = BIT(0),
@@ -1751,6 +1773,7 @@ static struct clk_branch gcc_blsp2_qup2_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup3_i2c_apps_clk = {
 	.halt_reg = 0x2A008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2A008,
 		.enable_mask = BIT(0),
@@ -1768,6 +1791,7 @@ static struct clk_branch gcc_blsp2_qup3_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup3_spi_apps_clk = {
 	.halt_reg = 0x2A004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2A004,
 		.enable_mask = BIT(0),
@@ -1785,6 +1809,7 @@ static struct clk_branch gcc_blsp2_qup3_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup4_i2c_apps_clk = {
 	.halt_reg = 0x2C008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2C008,
 		.enable_mask = BIT(0),
@@ -1802,6 +1827,7 @@ static struct clk_branch gcc_blsp2_qup4_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup4_spi_apps_clk = {
 	.halt_reg = 0x2C004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2C004,
 		.enable_mask = BIT(0),
@@ -1819,6 +1845,7 @@ static struct clk_branch gcc_blsp2_qup4_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup5_i2c_apps_clk = {
 	.halt_reg = 0x2E008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2E008,
 		.enable_mask = BIT(0),
@@ -1836,6 +1863,7 @@ static struct clk_branch gcc_blsp2_qup5_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup5_spi_apps_clk = {
 	.halt_reg = 0x2E004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2E004,
 		.enable_mask = BIT(0),
@@ -1853,6 +1881,7 @@ static struct clk_branch gcc_blsp2_qup5_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup6_i2c_apps_clk = {
 	.halt_reg = 0x30008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x30008,
 		.enable_mask = BIT(0),
@@ -1870,6 +1899,7 @@ static struct clk_branch gcc_blsp2_qup6_i2c_apps_clk = {
 
 static struct clk_branch gcc_blsp2_qup6_spi_apps_clk = {
 	.halt_reg = 0x30004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x30004,
 		.enable_mask = BIT(0),
@@ -1887,6 +1917,7 @@ static struct clk_branch gcc_blsp2_qup6_spi_apps_clk = {
 
 static struct clk_branch gcc_blsp2_uart1_apps_clk = {
 	.halt_reg = 0x27004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x27004,
 		.enable_mask = BIT(0),
@@ -1904,6 +1935,7 @@ static struct clk_branch gcc_blsp2_uart1_apps_clk = {
 
 static struct clk_branch gcc_blsp2_uart2_apps_clk = {
 	.halt_reg = 0x29004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x29004,
 		.enable_mask = BIT(0),
@@ -1921,6 +1953,7 @@ static struct clk_branch gcc_blsp2_uart2_apps_clk = {
 
 static struct clk_branch gcc_blsp2_uart3_apps_clk = {
 	.halt_reg = 0x2B004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x2B004,
 		.enable_mask = BIT(0),
@@ -1939,6 +1972,8 @@ static struct clk_branch gcc_blsp2_uart3_apps_clk = {
 static struct clk_branch gcc_boot_rom_ahb_clk = {
 	.halt_reg = 0x38004,
 	.halt_check = BRANCH_HALT_VOTED,
+	.hwcg_reg = 0x38004,
+	.hwcg_bit = 1,
 	.clkr = {
 		.enable_reg = 0x52004,
 		.enable_mask = BIT(10),
@@ -1951,6 +1986,7 @@ static struct clk_branch gcc_boot_rom_ahb_clk = {
 
 static struct clk_branch gcc_cfg_noc_usb3_axi_clk = {
 	.halt_reg = 0x05018,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x05018,
 		.enable_mask = BIT(0),
@@ -1968,6 +2004,7 @@ static struct clk_branch gcc_cfg_noc_usb3_axi_clk = {
 
 static struct clk_branch gcc_bimc_gfx_clk = {
 	.halt_reg = 0x46040,
+	.halt_check = BRANCH_HALT_SKIP,
 	.clkr = {
 		.enable_reg = 0x46040,
 		.enable_mask = BIT(0),
@@ -1981,6 +2018,7 @@ static struct clk_branch gcc_bimc_gfx_clk = {
 
 static struct clk_branch gcc_gp1_clk = {
 	.halt_reg = 0x64000,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x64000,
 		.enable_mask = BIT(0),
@@ -1998,6 +2036,7 @@ static struct clk_branch gcc_gp1_clk = {
 
 static struct clk_branch gcc_gp2_clk = {
 	.halt_reg = 0x65000,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x65000,
 		.enable_mask = BIT(0),
@@ -2015,6 +2054,7 @@ static struct clk_branch gcc_gp2_clk = {
 
 static struct clk_branch gcc_gp3_clk = {
 	.halt_reg = 0x66000,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x66000,
 		.enable_mask = BIT(0),
@@ -2061,6 +2101,7 @@ static struct clk_branch gcc_gpu_cfg_ahb_clk = {
 
 static struct clk_branch gcc_gpu_iref_clk = {
 	.halt_reg = 0x88010,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x88010,
 		.enable_mask = BIT(0),
@@ -2073,6 +2114,7 @@ static struct clk_branch gcc_gpu_iref_clk = {
 
 static struct clk_branch gcc_hmss_dvm_bus_clk = {
 	.halt_reg = 0x4808C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x4808C,
 		.enable_mask = BIT(0),
@@ -2086,6 +2128,7 @@ static struct clk_branch gcc_hmss_dvm_bus_clk = {
 
 static struct clk_branch gcc_mmss_noc_cfg_ahb_clk = {
 	.halt_reg = 0x09004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x09004,
 		.enable_mask = BIT(0),
@@ -2099,6 +2142,7 @@ static struct clk_branch gcc_mmss_noc_cfg_ahb_clk = {
 
 static struct clk_branch gcc_mmss_sys_noc_axi_clk = {
 	.halt_reg = 0x09000,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x09000,
 		.enable_mask = BIT(0),
@@ -2111,6 +2155,7 @@ static struct clk_branch gcc_mmss_sys_noc_axi_clk = {
 
 static struct clk_branch gcc_pcie_0_aux_clk = {
 	.halt_reg = 0x6B014,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x6B014,
 		.enable_mask = BIT(0),
@@ -2128,6 +2173,7 @@ static struct clk_branch gcc_pcie_0_aux_clk = {
 
 static struct clk_branch gcc_pcie_0_cfg_ahb_clk = {
 	.halt_reg = 0x6B010,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x6B010,
 		.enable_mask = BIT(0),
@@ -2140,6 +2186,7 @@ static struct clk_branch gcc_pcie_0_cfg_ahb_clk = {
 
 static struct clk_branch gcc_pcie_0_mstr_axi_clk = {
 	.halt_reg = 0x6B00C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x6B00C,
 		.enable_mask = BIT(0),
@@ -2165,6 +2212,7 @@ static struct clk_branch gcc_pcie_0_pipe_clk = {
 
 static struct clk_branch gcc_pcie_0_slv_axi_clk = {
 	.halt_reg = 0x6B008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x6B008,
 		.enable_mask = BIT(0),
@@ -2177,6 +2225,7 @@ static struct clk_branch gcc_pcie_0_slv_axi_clk = {
 
 static struct clk_branch gcc_pcie_phy_aux_clk = {
 	.halt_reg = 0x6F004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x6F004,
 		.enable_mask = BIT(0),
@@ -2194,6 +2243,7 @@ static struct clk_branch gcc_pcie_phy_aux_clk = {
 
 static struct clk_branch gcc_pdm2_clk = {
 	.halt_reg = 0x3300C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x3300C,
 		.enable_mask = BIT(0),
@@ -2241,6 +2291,7 @@ static struct clk_branch gcc_prng_ahb_clk = {
 
 static struct clk_branch gcc_sdcc2_ahb_clk = {
 	.halt_reg = 0x14008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x14008,
 		.enable_mask = BIT(0),
@@ -2253,6 +2304,7 @@ static struct clk_branch gcc_sdcc2_ahb_clk = {
 
 static struct clk_branch gcc_sdcc2_apps_clk = {
 	.halt_reg = 0x14004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x14004,
 		.enable_mask = BIT(0),
@@ -2270,6 +2322,7 @@ static struct clk_branch gcc_sdcc2_apps_clk = {
 
 static struct clk_branch gcc_sdcc4_ahb_clk = {
 	.halt_reg = 0x16008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x16008,
 		.enable_mask = BIT(0),
@@ -2282,6 +2335,7 @@ static struct clk_branch gcc_sdcc4_ahb_clk = {
 
 static struct clk_branch gcc_sdcc4_apps_clk = {
 	.halt_reg = 0x16004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x16004,
 		.enable_mask = BIT(0),
@@ -2299,6 +2353,7 @@ static struct clk_branch gcc_sdcc4_apps_clk = {
 
 static struct clk_branch gcc_tsif_ahb_clk = {
 	.halt_reg = 0x36004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x36004,
 		.enable_mask = BIT(0),
@@ -2311,6 +2366,7 @@ static struct clk_branch gcc_tsif_ahb_clk = {
 
 static struct clk_branch gcc_tsif_ref_clk = {
 	.halt_reg = 0x36008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x36008,
 		.enable_mask = BIT(0),
@@ -2363,6 +2419,7 @@ static struct clk_branch gcc_ufs_axi_clk = {
 
 static struct clk_branch gcc_ufs_axi_hw_ctl_clk = {
 	.halt_reg = 0x75008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x75008,
 		.enable_mask = BIT(0),
@@ -2400,6 +2457,7 @@ static struct clk_branch gcc_ufs_ice_core_clk = {
 
 static struct clk_branch gcc_ufs_ice_core_hw_ctl_clk = {
 	.halt_reg = 0x7600C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x7600C,
 		.enable_mask = BIT(0),
@@ -2437,6 +2495,7 @@ static struct clk_branch gcc_ufs_phy_aux_clk = {
 
 static struct clk_branch gcc_ufs_phy_aux_hw_ctl_clk = {
 	.halt_reg = 0x76040,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x76040,
 		.enable_mask = BIT(0),
@@ -2510,6 +2569,7 @@ static struct clk_branch gcc_ufs_unipro_core_clk = {
 
 static struct clk_branch gcc_ufs_unipro_core_hw_ctl_clk = {
 	.halt_reg = 0x76008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x76008,
 		.enable_mask = BIT(0),
@@ -2527,6 +2587,7 @@ static struct clk_branch gcc_ufs_unipro_core_hw_ctl_clk = {
 
 static struct clk_branch gcc_usb30_master_clk = {
 	.halt_reg = 0x0F008,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x0F008,
 		.enable_mask = BIT(0),
@@ -2546,6 +2607,7 @@ static struct clk_branch gcc_usb30_master_clk = {
 
 static struct clk_branch gcc_usb30_mock_utmi_clk = {
 	.halt_reg = 0x0F010,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x0F010,
 		.enable_mask = BIT(0),
@@ -2563,6 +2625,7 @@ static struct clk_branch gcc_usb30_mock_utmi_clk = {
 
 static struct clk_branch gcc_usb30_sleep_clk = {
 	.halt_reg = 0x0F00C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x0F00C,
 		.enable_mask = BIT(0),
@@ -2575,6 +2638,7 @@ static struct clk_branch gcc_usb30_sleep_clk = {
 
 static struct clk_branch gcc_usb3_phy_aux_clk = {
 	.halt_reg = 0x50000,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x50000,
 		.enable_mask = BIT(0),
@@ -2589,20 +2653,6 @@ static struct clk_branch gcc_usb3_phy_aux_clk = {
 		},
 	},
 };
-
-/*
-static struct clk_gate2 gcc_usb3_phy_pipe_clk = {
-	.udelay = 50,
-	.clkr = {
-		.enable_reg = 0x50004,
-		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data) {
-				.name = "gcc_usb3_phy_pipe_clk",
-				.ops = &clk_gate2_ops,
-		},
-	},
-};
-*/
 
 static struct clk_branch gcc_usb3_phy_pipe_clk = {
 	.halt_reg = 0x50004,
@@ -2662,6 +2712,7 @@ static struct clk_branch gcc_mss_mnoc_bimc_axi_clk = {
 
 static struct clk_branch gcc_mss_snoc_axi_clk = {
 	.halt_reg = 0x8A03C,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x8A03C,
 		.enable_mask = BIT(0),
@@ -2674,6 +2725,7 @@ static struct clk_branch gcc_mss_snoc_axi_clk = {
 
 static struct clk_branch gcc_dcc_ahb_clk = {
 	.halt_reg = 0x84004,
+	.halt_check = BRANCH_HALT,
 	.clkr = {
 		.enable_reg = 0x84004,
 		.enable_mask = BIT(0),
