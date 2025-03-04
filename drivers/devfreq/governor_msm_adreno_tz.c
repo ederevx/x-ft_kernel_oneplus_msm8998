@@ -49,22 +49,12 @@ static DEFINE_SPINLOCK(suspend_lock);
  * according to the accumulated busy_bcounter. 
  * 
  * Maximum multiplier is <BOOST_MAX> at busy_bcounter=
- * <BUSY_BMAX - BUSY_BMIN>.
- * 
- * Minimum multiplier is <BOOST_MIN> at busy_bcounter=1.
+ * <BUSY_BMAX>.
  * 
  * Multiplier increases by <BOOST_PERC / 100> per count.
  */
 #define BOOST_MAX 4
-#define BOOST_MIN 2
 #define BOOST_PERC 20 /* divided by 100 */
-
-#define BUSY_BMAX (unsigned int)max(((BOOST_MAX - 1) * 100) / BOOST_PERC, 0)
-#define BUSY_BMIN (unsigned int)max(((BOOST_MIN - 1) * 100) / BOOST_PERC, 0)
-#define BUSY_BCLAMPED min(busy_bcounter + BUSY_BMIN, BUSY_BMAX)
-
-#define BUSY_BOOST(busy) \
-	((busy * BUSY_BCLAMPED * BOOST_PERC) / 100)
 
 #define TZ_RESET_ID		0x3
 #define TZ_UPDATE_ID		0x4
@@ -84,7 +74,19 @@ static DEFINE_SPINLOCK(suspend_lock);
 static u64 suspend_time;
 static u64 suspend_start;
 static unsigned long acc_total, acc_relative_busy;
-static unsigned int busy_bcounter;
+
+static unsigned int busy_bcounter = 0;
+static const unsigned int busy_bmax = (((BOOST_MAX - 1) * 100) / BOOST_PERC);
+
+/*
+ * Calculates the incremental busy time boost according to
+ * the busy_bcounter.
+ */
+static unsigned long get_busy_boost(unsigned long busy)
+{
+	unsigned int busy_b = min(busy_bcounter, busy_bmax);
+	return (busy * busy_b * BOOST_PERC) / 100;
+}
 
 /*
  * Returns GPU suspend time in millisecond.
@@ -378,7 +380,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 		busy_bcounter = 0;
 
 	if (busy_bcounter) {
-		unsigned long busy_btime = BUSY_BOOST(stats.busy_time);
+		unsigned long busy_btime = get_busy_boost(stats.busy_time);
 
 		priv->bin.busy_time += busy_btime;
 		if (priv->bin.busy_time > priv->bin.total_time)
@@ -413,7 +415,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 		return level;
 	}
 
-	if (busy_bcounter < BUSY_BMAX)
+	if (busy_bcounter < busy_bmax)
 		busy_bcounter++;
 
 	/*
