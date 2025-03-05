@@ -2201,7 +2201,7 @@ cpu_util_freq_walt(int cpu, struct sched_walt_cpu_load *walt_load)
 	int boost;
 
 	if (unlikely(walt_disabled || !sysctl_sched_use_walt_cpu_util))
-		return cpu_util_cfs(cpu, 1);
+		return cpu_util_cfs(cpu);
 
 	boost = per_cpu(sched_load_boost, cpu);
 	util_unboosted = util = freq_policy_load(rq);
@@ -2657,10 +2657,10 @@ static inline unsigned long cpu_util_dl(struct rq *rq)
  *
  * Return: (Estimated) utilization for the specified CPU.
  */
-static inline unsigned long cpu_util_cfs(int cpu, bool boost)
+static inline unsigned long cpu_util_cfs(int cpu)
 {
 	struct cfs_rq *cfs_rq;
-	unsigned long runnable, util;
+	unsigned long util;
 
 #ifdef CONFIG_SCHED_WALT
 	if (likely(!walt_disabled && sysctl_sched_use_walt_cpu_util)) {
@@ -2674,11 +2674,6 @@ static inline unsigned long cpu_util_cfs(int cpu, bool boost)
 
 	cfs_rq = &cpu_rq(cpu)->cfs;
 	util = READ_ONCE(cfs_rq->avg.util_avg);
-
-	if (boost) {
-		runnable = READ_ONCE(cfs_rq->avg.runnable_load_avg);
-		util = max(util, runnable);
-	}
 
 	if (sched_feat(UTIL_EST)) {
 		util = max_t(unsigned long, util,
@@ -2789,7 +2784,7 @@ static inline bool uclamp_rq_is_capped(struct rq *rq)
 	if (!static_branch_likely(&sched_uclamp_used))
 		return false;
 
-	rq_util = cpu_util_cfs(cpu_of(rq), 1) + cpu_util_rt(rq);
+	rq_util = cpu_util_cfs(cpu_of(rq)) + cpu_util_rt(rq);
 	max_util = READ_ONCE(rq->uclamp[UCLAMP_MAX].value);
 
 	return max_util != SCHED_CAPACITY_SCALE && rq_util >= max_util;
