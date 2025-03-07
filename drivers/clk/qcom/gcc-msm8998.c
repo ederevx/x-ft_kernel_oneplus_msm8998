@@ -48,7 +48,6 @@ enum {
 	P_BI_TCXO,
 	P_GPLL0,
 	P_GPLL0_EARLY_DIV,
-	P_GPLL4,
 	P_SLEEP_CLK,
 	P_AUD_REF_CLK,
 };
@@ -84,18 +83,6 @@ static const char * const gcc_parent_names_2[] = {
 	"bi_tcxo",
 	"gpll0",
 	"gpll0_early_div",
-};
-
-static const struct parent_map gcc_parent_map_4[] = {
-	{ P_BI_TCXO, 0},
-	{ P_GPLL0, 1 },
-	{ P_GPLL4, 5 },
-};
-
-static const char * const gcc_parent_names_4[] = {
-	"bi_tcxo",
-	"gpll0",
-	"gpll4",
 };
 
 static const struct parent_map gcc_parent_map_5[] = {
@@ -204,53 +191,6 @@ static struct clk_alpha_pll gpll0_ao = {
 	},
 };
 
-static struct clk_alpha_pll_postdiv gpll0_out_main = {
-	.offset = 0x0,
-	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
-	.post_div_table = clk_alpha_div_table,
-	.post_div_shift = ALPHA_POST_DIV_EVEN_SHIFT,
-	.num_post_div = ARRAY_SIZE(clk_alpha_div_table),
-	.clkr.hw.init = &(struct clk_init_data){
-		.name = "gpll0_out_main",
-		.parent_names = (const char *[]){ "gpll0" },
-		.num_parents = 1,
-		.ops = &clk_alpha_pll_postdiv_fabia_ops,
-	},
-};
-
-static struct clk_alpha_pll gpll4 = {
-	.offset = 0x77000,
-	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
-	.vco_table = fabia_vco,
-	.num_vco = ARRAY_SIZE(fabia_vco),
-	.clkr = {
-		.enable_reg = 0x52000,
-		.enable_mask = BIT(4),
-		.hw.init = &(struct clk_init_data){
-			.name = "gpll4",
-			.parent_names = (const char *[]){ "bi_tcxo" },
-			.num_parents = 1,
-			.ops = &clk_alpha_pll_fixed_fabia_ops,
-			VDD_DIG_FMAX_MAP3(LOWER, 400000000, LOW, 800000000,
-					NOMINAL, 1600000000),
-		}
-	},
-};
-
-static struct clk_alpha_pll_postdiv gpll4_out_main = {
-	.offset = 0x77000,
-	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
-	.post_div_table = clk_alpha_div_table,
-	.post_div_shift = ALPHA_POST_DIV_EVEN_SHIFT,
-	.num_post_div = ARRAY_SIZE(clk_alpha_div_table),
-	.clkr.hw.init = &(struct clk_init_data){
-		.name = "gpll4_out_main",
-		.parent_names = (const char *[]){ "gpll4" },
-		.num_parents = 1,
-		.ops = &clk_alpha_pll_postdiv_fabia_ops,
-	},
-};
-
 static struct clk_gate2 gcc_mmss_gpll0_clk = {
 	.udelay = 500,
 	.clkr = {
@@ -330,28 +270,6 @@ static struct clk_gate2 gcc_mss_gpll0_div_clk_src = {
 		},
 	},
 };
-
-/*
-static struct pll_vote_clk gpll4 = {
-	.en_reg = (void __iomem *)0x52000,
-	.en_mask = BIT(4),
-	.status_reg = (void __iomem *)0x77000,
-	.status_mask = BIT(31),
-	.clkr = {
-		.rate = 384000000,
-		(const char*[]) {
-			"cxo_clk_src",
-		},
-		.num_parents = 1,
-		.name = "gpll4",
-		.parent_names = gcc_parent_names_,
-		.num_parents = ARRAY_SIZE(gcc_parent_names_),
-		.ops = &clk_ops_pll_vote,
-		VDD_DIG_FMAX_MAP3(LOWER, 400000000, LOW, 800000000,
-					NOMINAL, 1600000000),
-	},
-};
-*/
 
 static struct freq_tbl ftbl_usb30_master_clk_src[] = {
 	F(  19200000,	P_BI_TCXO,       1,    0,     0),
@@ -1245,30 +1163,6 @@ static struct clk_branch gcc_hmss_rbcpr_clk = {
 			.flags = CLK_SET_RATE_PARENT,
 			.ops = &clk_branch2_ops,
 		},
-	},
-};
-
-
-static struct freq_tbl ftbl_qspi_ref_clk_src[] = {
-	F(  75000000,	P_GPLL0,    8,    0,     0),
-	F( 150000000,	P_GPLL0,    4,    0,     0),
-	F( 256000000,	P_GPLL4,  1.5,    0,     0),
-	F( 300000000,	P_GPLL0,    2,    0,     0),
-	{ }
-};
-
-static struct clk_rcg2 qspi_ref_clk_src = {
-	.cmd_rcgr = 0x9000C,
-	.hid_width = 5,
-	.parent_map = gcc_parent_map_2,
-	.freq_tbl = ftbl_qspi_ref_clk_src,
-	.clkr.hw.init = &(struct clk_init_data) {
-		.name = "qspi_ref_clk_src",
-		.parent_names = gcc_parent_names_2,
-		.num_parents = ARRAY_SIZE(gcc_parent_names_2),
-		.ops = &clk_rcg2_ops,
-		VDD_DIG_FMAX_MAP3(LOWER, 40000000, LOW, 160400000,
-							NOMINAL, 320800000),
 	},
 };
 
@@ -2760,35 +2654,6 @@ static struct clk_branch hlos1_vote_lpass_adsp_smmu_clk = {
 	},
 };
 
-static struct clk_branch gcc_qspi_ahb_clk = {
-	.halt_reg = 0x90004,
-	.clkr = {
-		.enable_reg = 0x90004,
-		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data) {
-			.name = "gcc_qspi_ahb_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch gcc_qspi_ref_clk = {
-	.halt_reg = 0x90008,
-	.clkr = {
-		.enable_reg = 0x90008,
-		.enable_mask = BIT(0),
-		.hw.init = &(struct clk_init_data) {
-			.name = "gcc_qspi_ref_clk",
-			.parent_names = (const char*[]) {
-				"qspi_ref_clk_src"
-			},
-			.num_parents = 1,
-			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
 static struct measure_clk_data debug_mux_priv = {
 	.xo_div4_cbcr = 0x43008,
 	.ctl_reg = 0x62004,
@@ -3011,9 +2876,6 @@ static struct clk_hw *gcc_msm8998_hws[] = {
 static struct clk_regmap *gcc_msm8998_clocks[] = {
 	[GPLL0] = &gpll0.clkr,
 	[GPLL0_AO] = &gpll0_ao.clkr,
-	[GPLL0_OUT_MAIN] = &gpll0_out_main.clkr,
-	[GPLL4] = &gpll4.clkr,
-	[GPLL4_OUT_MAIN] = &gpll4_out_main.clkr,
 	[USB30_MASTER_CLK_SRC] = &usb30_master_clk_src.clkr,
 	[PCIE_AUX_CLK_SRC] = &pcie_aux_clk_src.clkr,
 	[UFS_AXI_CLK_SRC] = &ufs_axi_clk_src.clkr,
@@ -3061,7 +2923,6 @@ static struct clk_regmap *gcc_msm8998_clocks[] = {
 	[USB30_MOCK_UTMI_CLK_SRC] = &usb30_mock_utmi_clk_src.clkr,
 	[USB3_PHY_AUX_CLK_SRC] = &usb3_phy_aux_clk_src.clkr,
 	[HMSS_GPLL0_CLK_SRC] = &hmss_gpll0_clk_src.clkr,
-	[QSPI_REF_CLK_SRC] = &qspi_ref_clk_src.clkr,
 	[GCC_AGGRE1_UFS_AXI_CLK] = &gcc_aggre1_ufs_axi_clk.clkr,
 	[GCC_AGGRE1_UFS_AXI_HW_CTL_CLK] = &gcc_aggre1_ufs_axi_hw_ctl_clk.clkr,
 	[GCC_AGGRE1_USB3_AXI_CLK] = &gcc_aggre1_usb3_axi_clk.clkr,
@@ -3155,8 +3016,6 @@ static struct clk_regmap *gcc_msm8998_clocks[] = {
 	[GCC_DCC_AHB_CLK] = &gcc_dcc_ahb_clk.clkr,
 	[HLOS1_VOTE_LPASS_CORE_SMMU_CLK] = &hlos1_vote_lpass_core_smmu_clk.clkr,
 	[HLOS1_VOTE_LPASS_ADSP_SMMU_CLK] = &hlos1_vote_lpass_adsp_smmu_clk.clkr,
-	[GCC_QSPI_AHB_CLK] = &gcc_qspi_ahb_clk.clkr,
-	[GCC_QSPI_REF_CLK] = &gcc_qspi_ref_clk.clkr,
 	[GCC_GPU_GPLL0_CLK] = &gcc_gpu_gpll0_clk.clkr,
 	[GCC_GPU_GPLL0_DIV_CLK] = &gcc_gpu_gpll0_div_clk.clkr,
 	[GCC_MMSS_GPLL0_CLK] = &gcc_mmss_gpll0_clk.clkr,
@@ -3208,28 +3067,14 @@ static struct of_device_id gcc_msm8998_match_table[] = {
 		.compatible = "qcom,gcc-msm8998-v2",
 		.data = (void *)(uintptr_t)2,
 	},
-	{
-		.compatible = "qcom,gcc-msmhamster",
-		.data = (void *)(uintptr_t)0,
-	},
 	{}
 };
 
 static void gcc_msm8998_clocks_fixup(int socrev)
 {
-	if (socrev < 1)
-		return;
-
 	/* 8998v1 only */
 	if (socrev == 1)
 		gcc_msm8998_clocks[GCC_UFS_RX_SYMBOL_1_CLK] = NULL;
-
-	/* 8998v1 and v2 */
-	if (socrev >= 1) {
-		gcc_msm8998_clocks[QSPI_REF_CLK_SRC] = NULL;
-		gcc_msm8998_clocks[GCC_QSPI_REF_CLK] = NULL;
-		gcc_msm8998_clocks[GCC_QSPI_AHB_CLK] = NULL;	
-	}
 }
 
 static int gcc_msm8998_probe(struct platform_device *pdev)
