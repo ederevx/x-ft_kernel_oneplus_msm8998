@@ -1151,8 +1151,7 @@
 		compatible = "qcom,gpucc-early-msm8998";
 		reg = <0x5065000 0x9000>;
 		vdd_dig-supply = <&pm8998_s1_level>;
-		clock-names = "gpll0";
-		clocks = <&clock_gcc GCC_GPU_GPLL0_CLK>;
+		vdd_mx-supply = <&pm8998_s9_level>;
 		#clock-cells = <1>;
 		#reset-cells = <1>;
 	};
@@ -1161,10 +1160,8 @@
 		compatible = "qcom,gpucc-msm8998";
 		reg = <0x5065000 0x9000>;
 		vdd_gpucc-supply = <&gfx_vreg>;
-		vdd_mx-supply = <&pm8998_s9_level>;
 		qcom,gfx3d_clk_src-opp-handle = <&msm_gpu>;
 		#clock-cells = <1>;
-		#reset-cells = <1>;
 	};
 
 	clock_cpu: qcom,cpu-clock-8998@179c0000 {
