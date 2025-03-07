@@ -336,26 +336,6 @@ static struct clk_branch gpucc_rbcpr_clk = {
 	},
 };
 
-#if 0
-static struct mux_clk gpucc_gcc_dbg_clk = {
-	.ops = &mux_reg_ops,
-	.en_mask = BIT(16),
-	.mask = 0x3FF,
-	.offset = GPUCC_DEBUG_CLK_CTL,
-	.en_offset = GPUCC_DEBUG_CLK_CTL,
-	MUX_SRC_LIST(
-		{ &gpucc_rbcpr_clk.c, 0x0003 },
-		{ &gpucc_rbbmtimer_clk.c, 0x0005 },
-		{ &gpucc_gfx3d_isense_clk.c, 0x000a },
-	),
-	.clkr.hw.init = &(struct clk_init_data) {
-		.name = "gpucc_gcc_dbg_clk",
-		.ops = &clk_ops_gen_mux,
-		.flags = CLKFLAG_NO_RATE_CACHE,
-	},
-};
-#endif
-
 static void enable_gfx_crc(void __iomem *base)
 {
 	u32 regval;
@@ -443,31 +423,10 @@ static void enable_gfx_crc(void __iomem *base)
 	writel_relaxed(regval, base + GPU_CX_GDSCR_OFFSET);
 }
 
-/*
-static struct mux_clk gfxcc_dbg_clk = {
-	.ops = &mux_reg_ops,
-	.en_mask = BIT(16),
-	.mask = 0x3FF,
-	.offset = GPUCC_DEBUG_CLK_CTL,
-	.en_offset = GPUCC_DEBUG_CLK_CTL,
-	MUX_SRC_LIST(
-		{ &gpucc_gfx3d_clk.c, 0x0008 },
-	),
-	.clkr.hw.init = &(struct clk_init_data) {
-		.name = "gfxcc_dbg_clk",
-		.ops = &clk_ops_gen_mux,
-		.flags = CLKFLAG_NO_RATE_CACHE,
-	},
-};
-*/
-
 static struct clk_regmap *gpucc_msm8998_clocks[] = {
-	[GPU_PLL0_PLL] = &gpu_pll0_pll.clkr,
 	[GPU_PLL0_PLL_OUT_EVEN] = &gpu_pll0_out_even.clkr,
 	[GFX3D_CLK_SRC] = &gfx3d_clk_src.clkr,
 	[GPUCC_GFX3D_CLK] = &gpucc_gfx3d_clk.clkr,
-	//[GPUCC_DBG_CLK] = &gfxcc_dbg_clk.clkr,
-	//[GPUCC_GCC_DBG_CLK] = &gpucc_gcc_dbg_clk.clkr,
 };
 
 static struct clk_regmap *gpucc_msm8998_early_clocks[] = {
@@ -478,16 +437,14 @@ static struct clk_regmap *gpucc_msm8998_early_clocks[] = {
 	[GPUCC_RBBMTIMER_CLK] = &gpucc_rbbmtimer_clk.clkr,
 	[GFX3D_ISENSE_CLK_SRC] = &gfx3d_isense_clk_src.clkr,
 	[GPUCC_GFX3D_ISENSE_CLK] = &gpucc_gfx3d_isense_clk.clkr,
-};
-
-static const struct qcom_reset_map gpucc_msm8998_resets[] = {
-	[GPU_CX_BCR] = { 0x1000 },
-	[GPU_GX_BCR] = { 0x1090 },
+	[GPU_PLL0_PLL] = &gpu_pll0_pll.clkr,
 };
 
 static const struct qcom_reset_map gpucc_msm8998_early_resets[] = {
 	[RBCPR_BCR] = { 0x1050 },
 	[GPU_ISENSE_BCR] = { 0x1120 },
+	[GPU_CX_BCR] = { 0x1000 },
+	[GPU_GX_BCR] = { 0x1090 },
 };
 
 static const struct regmap_config gpucc_msm8998_regmap_config = {
@@ -502,8 +459,6 @@ static const struct qcom_cc_desc gpucc_msm8998_desc = {
 	.config = &gpucc_msm8998_regmap_config,
 	.clks = gpucc_msm8998_clocks,
 	.num_clks = ARRAY_SIZE(gpucc_msm8998_clocks),
-	.resets = gpucc_msm8998_resets,
-	.num_resets = ARRAY_SIZE(gpucc_msm8998_resets),
 };
 
 int gpucc_msm8998_probe(struct platform_device *pdev)
@@ -545,14 +500,6 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev,
 				"Unable to get vdd_gpucc regulator\n");
 		return PTR_ERR(vdd_gpucc.regulator[0]);
-	}
-
-	vdd_gpucc_mx.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_mx");
-	if (IS_ERR(vdd_gpucc_mx.regulator[0])) {
-		if (PTR_ERR(vdd_gpucc_mx.regulator[0]) != -EPROBE_DEFER)
-			dev_err(&pdev->dev,
-				"Unable to get vdd_mx regulator\n");
-		return PTR_ERR(vdd_gpucc_mx.regulator[0]);
 	}
 
 	/* Clear the DBG_CLK_DIV bits of the GPU debug register */
@@ -609,16 +556,7 @@ static const struct qcom_cc_desc gpucc_early_msm8998_desc = {
 int gpucc_early_msm8998_probe(struct platform_device *pdev)
 {
 	struct regmap *regmap;
-	struct clk *tmp;
 	int rc;
-
-	tmp = devm_clk_get(&pdev->dev, "gpll0");
-	if (IS_ERR(tmp)) {
-		if (PTR_ERR(tmp) != -EPROBE_DEFER)
-			dev_err(&pdev->dev,
-				"The GPLL0 clock cannot be found.\n");
-		return PTR_ERR(tmp);
-	}
 
 	regmap = qcom_cc_map(pdev, &gpucc_early_msm8998_desc);
 	if (IS_ERR(regmap))
@@ -632,14 +570,19 @@ int gpucc_early_msm8998_probe(struct platform_device *pdev)
 		return PTR_ERR(vdd_dig.regulator[0]);
 	}
 
+	vdd_gpucc_mx.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_mx");
+	if (IS_ERR(vdd_gpucc_mx.regulator[0])) {
+		if (PTR_ERR(vdd_gpucc_mx.regulator[0]) != -EPROBE_DEFER)
+			dev_err(&pdev->dev,
+				"Unable to get vdd_mx regulator\n");
+		return PTR_ERR(vdd_gpucc_mx.regulator[0]);
+	}
+
 	rc = qcom_cc_really_probe(pdev, &gpucc_early_msm8998_desc, regmap);
 	if (rc) {
 		dev_err(&pdev->dev, "Failed to register GPUCC clocks\n");
 		return rc;
 	}
-
-	/* Set the rate for GPU XO to make the clk API happy */
-	clk_set_rate(gpucc_xo.clkr.hw.clk, 19200000);
 
 	dev_info(&pdev->dev, "Registered early GPUCC clocks\n");
 	return 0;

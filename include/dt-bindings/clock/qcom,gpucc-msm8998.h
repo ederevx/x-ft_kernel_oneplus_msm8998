@@ -13,13 +13,9 @@
  * GNU General Public License for more details.
  */
 
-#define GPU_PLL0_PLL		0
 #define GPU_PLL0_PLL_OUT_EVEN	1
 #define GFX3D_CLK_SRC		2
 #define GPUCC_GFX3D_CLK		3
-
-#define GPU_CX_BCR					0
-#define GPU_GX_BCR					1
 
 /* EARLY */
 #define GPUCC_XO		0
@@ -29,6 +25,9 @@
 #define GPUCC_RBBMTIMER_CLK	4
 #define GFX3D_ISENSE_CLK_SRC	5
 #define GPUCC_GFX3D_ISENSE_CLK	6
+#define GPU_PLL0_PLL		7
 
 #define RBCPR_BCR					0
 #define GPU_ISENSE_BCR					1
+#define GPU_CX_BCR					2
+#define GPU_GX_BCR					3
