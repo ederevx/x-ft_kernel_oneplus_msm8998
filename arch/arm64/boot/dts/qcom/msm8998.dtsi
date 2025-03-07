@@ -3147,6 +3147,7 @@
 };
 
 &gdsc_gpu_cx {
+	parent-supply = <&pm8998_s1_level>;
 	status = "ok";
 };
 
