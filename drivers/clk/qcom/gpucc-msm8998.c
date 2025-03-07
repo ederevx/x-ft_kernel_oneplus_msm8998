@@ -129,11 +129,15 @@ static struct clk_alpha_pll gpu_pll0_pll = {
 	.num_vco = ARRAY_SIZE(fabia_vco),
 	.config = &gpu_pll0_config,
 	.clkr.hw.init = &(struct clk_init_data) {
-			.name = "gpu_cc_pll0",
-			.parent_names = (const char *[]){ "gpucc_xo" },
-			.num_parents = 1,
-			.ops = &clk_alpha_pll_fabia_ops,
-			VDD_GPU_MX_FMAX_MAP1(MIN, 1420000500),
+		.name = "gpu_cc_pll0",
+		.parent_names = (const char *[]){ "gpucc_xo" },
+		.num_parents = 1,
+		.ops = &clk_alpha_pll_fabia_ops,
+		VDD_GPU_MX_FMAX_MAP4(
+			MIN, 615000000,
+			LOW, 1066000000,
+			LOW_L1, 1600000000,
+			NOMINAL, 2000000000),
 	},
 };
 
@@ -265,9 +269,6 @@ static struct clk_branch gpucc_gfx3d_clk = {
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
 			.ops = &clk_branch2_ops,
-			VDD_GPU_MX_FMAX_MAP3(LOW, 414000000,
-					     NOMINAL, 596000000,
-					     HIGH, 710000000),
 		},
 	}
 };
