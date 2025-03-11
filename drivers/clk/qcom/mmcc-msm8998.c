@@ -916,6 +916,7 @@ static struct clk_rcg2 video_core_clk_src = {
 	.hid_width = 5,
 	.parent_map = mmcc_parent_map_7a,
 	.freq_tbl = ftbl_video_core_clk_src,
+	.enable_safe_config = true,
 	.clkr.hw.init = &(struct clk_init_data) {
 		.name = "video_core_clk_src",
 		.parent_names = mmcc_parent_names_7a,
