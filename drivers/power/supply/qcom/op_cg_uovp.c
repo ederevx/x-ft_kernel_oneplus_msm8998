@@ -22,7 +22,9 @@
 #define CURRENT_FLOOR_UA       500000  /* SDP_CURRENT_UA = 500mA */
 #define CURRENT_DIFF_UA        250000  /* At least 250mA */
 
-#define CHG_SOFT_OVP_HYST_MV   100
+#define CHG_HYST_MV            100
+#define CHG_SOFT_OVP_HYST_MV   (CHG_SOFT_OVP_MV - CHG_HYST_MV)
+#define CHG_SOFT_UVP_HYST_MV   (CHG_SOFT_UVP_MV + CHG_HYST_MV)
 
 #define DETECT_CNT             3
 #define VOTE_RETRIES           3
@@ -34,7 +36,7 @@
 	(DCP_CHARGER_BIT | FLOAT_CHARGER_BIT | OCP_CHARGER_BIT)
 
 struct op_cg_current_table {
-	int max_ichg_ua;
+	int max_icl_ua;
 	int apsd_bit;
 };
 
@@ -45,11 +47,7 @@ struct op_cg_uovp_data {
 	int not_uovp_cnt;
 
 	int not_uovp_timeout;
-
 	int vchg_mv;
-	int current_ua;
-
-	int apsd_bit;
 
 	bool last_uovp_state;
 	bool uovp_state;
@@ -62,12 +60,7 @@ struct op_cg_uovp_data {
 /* Table of max currents uA with their supported apsd bit */
 static const struct op_cg_current_table op_cg_current_data[] = {
 	{ CURRENT_FLOOR_UA, SDP_CHARGER_BIT   },
-	{ 750000,           NO_CHARGER_BIT    },
-	{ 1000000,          NO_CHARGER_BIT    },
-	{ 1250000,          NO_CHARGER_BIT    },
 	{ 1500000,          CDP_CHARGER_BIT   },
-	{ 2000000,          NO_CHARGER_BIT    },
-	{ 2500000,          NO_CHARGER_BIT    },
 	{ 3000000,          FAST_CHARGER_BITS },
 };
 
@@ -76,9 +69,6 @@ static struct op_cg_uovp_data op_uovp_data;
 static void op_cg_uovp_cutoff(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-
-	if (opdata->uovp_cnt <= DETECT_CNT)
-		return;
 
 	pr_info("charger is over voltage, stop charging");
 	op_charging_en(chg, false);
@@ -89,9 +79,6 @@ static void op_cg_uovp_restore(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
 
-	if (opdata->not_uovp_cnt <= DETECT_CNT)
-		return;
-
 	pr_info("charger voltage is back to normal");
 	op_charging_en(chg, true);
 	op_check_battery_temp(chg);
@@ -100,29 +87,27 @@ static void op_cg_uovp_restore(struct op_cg_uovp_data *opdata)
 }
 
 static int op_cg_current_set(struct op_cg_uovp_data *opdata,
-				int ichg_ua)
+				int icl_ua)
 {
 	struct smb_charger *chg = opdata->chg;
-	int curr_ichg_ua;
+	int curr_icl_ua;
 	int ret = 0;
 	int retries = VOTE_RETRIES;
 
-	pr_info("voting ichg_ua=%d", ichg_ua);
-
 	while (retries-- > 0) {
 		ret = vote(chg->usb_icl_votable, UOVP_VOTER,
-						true, ichg_ua);
+						true, icl_ua);
 		if (ret) {
 			pr_err("can't set charger max current, ret=%d", ret);
-			goto err;
+			break;
 		}
 
 		/* Ensure we get the latest vote result */
 		rerun_election(chg->usb_icl_votable);
 
-		curr_ichg_ua = get_effective_result(chg->usb_icl_votable);
-		if (curr_ichg_ua != ichg_ua) {
-			pr_err("current ichg ua does not match vote, rerun AICL");
+		curr_icl_ua = get_effective_result(chg->usb_icl_votable);
+		if (curr_icl_ua != icl_ua) {
+			pr_err("current icl ua does not match vote, rerun AICL");
 			ret = -EINVAL;
 
 			/* Rerun AICL if we're not able to change effective 
@@ -137,69 +122,75 @@ static int op_cg_current_set(struct op_cg_uovp_data *opdata,
 		break;
 	}
 
-err:
 	return ret;
+}
+
+static int op_cg_get_ceil_icl_ua(struct op_cg_uovp_data *opdata)
+{
+	struct smb_charger *chg = opdata->chg;
+	int ceil_icl_ua = CURRENT_CEIL_DEFAULT;
+	int apsd_bit, i;
+
+	/* Make sure we have the latest APSD bit in case it has been rerun */
+	apsd_bit = op_get_apsd_bit(chg);
+
+	for (i = ARRAY_SIZE(op_cg_current_data) - 1; i >= 0; i--) {
+		const struct op_cg_current_table *d = &op_cg_current_data[i];
+
+		if (apsd_bit & d->apsd_bit) {
+			ceil_icl_ua = d->max_icl_ua;
+			break;
+		}
+	}
+
+	return ceil_icl_ua;
 }
 
 static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 				bool increase)
 {
 	struct smb_charger *chg = opdata->chg;
-	int ceil_ichg_ua = CURRENT_CEIL_DEFAULT;
-	int ichg_ua, i, ret = 0;
+	int ceil_icl_ua, icl_ua, target_icl_ua, ret;
 
-	ichg_ua = get_effective_result(chg->usb_icl_votable);
-
-	pr_info("smblib_ichg_ua=%d", ichg_ua);
-	opdata->current_ua = ichg_ua;
+	ceil_icl_ua = op_cg_get_ceil_icl_ua(opdata);
+	icl_ua = get_effective_result(chg->usb_icl_votable);
+	pr_info("ceil_icl_ua=%d icl_ua=%d", ceil_icl_ua, icl_ua);
 
 	if (increase) {
-		/* Make sure we have the latest APSD bit in case it has been rerun */
-		opdata->apsd_bit = op_get_apsd_bit(chg);
+		target_icl_ua = CURRENT_FLOOR_UA;
 
-		for (i = ARRAY_SIZE(op_cg_current_data) - 1; i >= 0; i--) {
-			const struct op_cg_current_table *d = &op_cg_current_data[i];
-
-			if (opdata->apsd_bit & d->apsd_bit) {
-				ceil_ichg_ua = d->max_ichg_ua;
-				break;
-			}
-		}
-		pr_info("ceil_ichg_ua=%d", ceil_ichg_ua);
-
-		for (i = 0; i < ARRAY_SIZE(op_cg_current_data); i++) {
-			const struct op_cg_current_table *d = &op_cg_current_data[i];
-
-			if (d->max_ichg_ua >= ceil_ichg_ua) {
-				ichg_ua = ceil_ichg_ua;
+		while (1) {
+			if (target_icl_ua >= ceil_icl_ua) {
+				target_icl_ua = ceil_icl_ua;
 				break;
 			}
 
-			if (d->max_ichg_ua >= ichg_ua + CURRENT_DIFF_UA) {
-				ichg_ua = d->max_ichg_ua;
+			if (target_icl_ua >= icl_ua + CURRENT_DIFF_UA)
 				break;
-			}
+
+			target_icl_ua += CURRENT_DIFF_UA;
 		}
 	} else {
-		for (i = ARRAY_SIZE(op_cg_current_data) - 1; i >= 0; i--) {
-			const struct op_cg_current_table *d = &op_cg_current_data[i];
+		target_icl_ua = ceil_icl_ua;
 
-			if (d->max_ichg_ua == CURRENT_FLOOR_UA) {
-				ichg_ua = CURRENT_FLOOR_UA;
+		while (1) {
+			if (target_icl_ua <= CURRENT_FLOOR_UA) {
+				target_icl_ua = CURRENT_FLOOR_UA;
 				break;
 			}
 
-			if (d->max_ichg_ua <= ichg_ua - CURRENT_DIFF_UA) {
-				ichg_ua = d->max_ichg_ua;
+			if (target_icl_ua <= icl_ua - CURRENT_DIFF_UA)
 				break;
-			}
+
+			target_icl_ua -= CURRENT_DIFF_UA;
 		}
 	}
 
-	if (opdata->current_ua != ichg_ua) {
-		ret = op_cg_current_set(opdata, ichg_ua);
+	if (icl_ua != target_icl_ua) {
+		pr_info("target_icl_ua=%d", target_icl_ua);
+		ret = op_cg_current_set(opdata, target_icl_ua);
 	} else {
-		pr_err("ichg_ua already at %d mA", (ichg_ua / 1000));
+		pr_err("icl_ua already at %d mA", (target_icl_ua / 1000));
 		ret = -EINVAL;
 	}
 	return ret;
@@ -208,36 +199,36 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-	bool is_uovp = false;
-	int ret = 0;
+	bool is_uovp;
+	int ret;
 
-	is_uovp = opdata->is_overvolt = (opdata->vchg_mv > CHG_SOFT_OVP_MV);
+	opdata->is_overvolt = (opdata->vchg_mv > CHG_SOFT_OVP_MV);
 
-	if (!opdata->is_overvolt)
+	is_uovp = opdata->is_overvolt;
+	if (!is_uovp)
 		is_uovp = (opdata->vchg_mv <= CHG_SOFT_UVP_MV);
 
 	if (!is_uovp)
 		return;
 
 	pr_info("charger is %svoltage count=%d voltage %d",
-		opdata->is_overvolt ? "over" : "under", 
-		opdata->uovp_cnt, opdata->vchg_mv);
+			opdata->is_overvolt ? "over" : "under", 
+			opdata->uovp_cnt, opdata->vchg_mv);
 
 	opdata->uovp_state = true;
+	opdata->not_uovp_cnt = 0;
 	opdata->not_uovp_timeout = 0;
-
-	if (opdata->not_uovp_cnt)
-		opdata->not_uovp_cnt = 0;
 
 	if (opdata->last_uovp_state)
 		opdata->uovp_cnt++;
 
-	if (opdata->uovp_cnt < DETECT_CNT)
-		pr_info("uovp_state=%d last_uovp_state=%d uovp_cnt=%d",
-			opdata->uovp_state, opdata->last_uovp_state, opdata->uovp_cnt);
-
 	/* Increase the current if over, decrease if under */
 	ret = op_cg_current_inc_dec(opdata, opdata->is_overvolt);
+
+	if (opdata->uovp_cnt <= DETECT_CNT) {
+		pr_info("uovp_cnt=%d", opdata->uovp_cnt);
+		return;
+	}
 
 	/* Only call cutoff if current control fails */
 	if (ret && !chg->chg_ovp)
@@ -247,43 +238,34 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-	bool is_uovp = false;
-	int ret = 0;
+	bool is_uovp;
+	int ret;
 
-	is_uovp = opdata->is_overvolt = 
-		!(opdata->vchg_mv < 
-			CHG_SOFT_OVP_MV - 
-			CHG_SOFT_OVP_HYST_MV);
+	opdata->is_overvolt = !(opdata->vchg_mv < CHG_SOFT_OVP_HYST_MV);
 
-	if (!opdata->is_overvolt)
-		is_uovp = !(opdata->vchg_mv > 
-				CHG_SOFT_UVP_MV + 
-				CHG_SOFT_OVP_HYST_MV);
+	is_uovp = opdata->is_overvolt;
+	if (!is_uovp)
+		is_uovp = !(opdata->vchg_mv > CHG_SOFT_UVP_HYST_MV);
 
 	if (is_uovp)
 		return;
 
 	opdata->uovp_state = false;
-
-	if (opdata->uovp_cnt)
-		opdata->uovp_cnt = 0;
+	opdata->uovp_cnt = 0;
 
 	if (!opdata->last_uovp_state)
 		opdata->not_uovp_cnt++;
 
-	if (opdata->not_uovp_cnt < DETECT_CNT)
-		pr_info("uovp_state=%d last_uovp_state=%d not_uovp_cnt=%d",
-			opdata->uovp_state, opdata->last_uovp_state,
-				opdata->not_uovp_cnt);
+	if (opdata->not_uovp_cnt <= DETECT_CNT) {
+		pr_info("not_uovp_cnt=%d", opdata->not_uovp_cnt);
+		return;
+	}
 
 	/* Restore charging first if it has been disabled */
 	if (chg->chg_ovp) {
 		op_cg_uovp_restore(opdata);
 		return;
 	}
-
-	if (opdata->not_uovp_cnt < DETECT_CNT)
-		return;
 
 	opdata->not_uovp_cnt = 0;
 
@@ -344,9 +326,8 @@ void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
 
 	if (chg_present) {
 		opdata->chg = chg;
-		opdata->apsd_bit = op_get_apsd_bit(chg);
 		opdata->initialized = true;
-		pr_info("UOVP is enabled, apsd_bit=0x%d", opdata->apsd_bit);
+		pr_info("UOVP is enabled, apsd_bit=0x%d", op_get_apsd_bit(chg));
 	} else {
 		chg->chg_ovp = false;
 		vote(chg->usb_icl_votable, UOVP_VOTER, false, 0);
