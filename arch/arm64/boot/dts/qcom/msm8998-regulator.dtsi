@@ -704,6 +704,7 @@
 		qcom,voltage-step = <4000>;
 		qcom,voltage-base = <352000>;
 		qcom,cpr-saw-use-unit-mV;
+		qcom,cpr-reset-step-quot-loop-en;
 
 		qcom,cpr-enable;
 		qcom,cpr-hw-closed-loop;
@@ -877,6 +878,7 @@
 		qcom,voltage-step = <4000>;
 		qcom,voltage-base = <352000>;
 		qcom,cpr-saw-use-unit-mV;
+		qcom,cpr-reset-step-quot-loop-en;
 
 		qcom,cpr-enable;
 		qcom,cpr-hw-closed-loop;
@@ -1062,6 +1064,7 @@
 		qcom,cpr-step-quot-init-max = <12>;
 		qcom,cpr-count-mode = <0>;		/* All-at-once min */
 		qcom,cpr-count-repeat = <1>;
+		qcom,cpr-reset-step-quot-loop-en;
 
 		vdd-supply = <&pm8005_s1>;
 		qcom,voltage-step = <4000>;
