@@ -52,9 +52,15 @@ static DEFINE_SPINLOCK(suspend_lock);
  * <BUSY_BMAX>.
  * 
  * Multiplier increases by <BOOST_PERC / 100> per count.
+ *
+ * The boost counter increases if the busy_time is equal 
+ * to or more than <BOOST_CEILING> frame length. Otherwise,
+ * it decreases if the busy_time drops below <BOOST_FLOOR>.
  */
-#define BOOST_MAX 4
-#define BOOST_PERC 20 /* divided by 100 */
+#define BOOST_MAX		4
+#define BOOST_PERC		20 /* divided by 100 */
+#define BOOST_CEILING		(CEILING / 2) /* 25msec */
+#define BOOST_FLOOR		(CEILING / 4) /* 12.5msec */
 
 #define TZ_RESET_ID		0x3
 #define TZ_UPDATE_ID		0x4
@@ -77,6 +83,23 @@ static unsigned long acc_total, acc_relative_busy;
 
 static unsigned int busy_bcounter = 0;
 static const unsigned int busy_bmax = (((BOOST_MAX - 1) * 100) / BOOST_PERC);
+
+/*
+ * Sets the busy boost counter according to busy time.
+ */
+static void set_busy_boost_counter(unsigned long busy)
+{
+	int counter = busy_bcounter;
+
+	if (busy >= BOOST_CEILING)
+		counter++;
+	else if (busy < BOOST_FLOOR)
+		counter--;
+	else
+		return;
+
+	busy_bcounter = clamp_t(unsigned int, counter, 0, busy_bmax);
+}
 
 /*
  * Calculates the incremental busy time boost according to
@@ -376,8 +399,8 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 	*freq = stats.current_frequency;
 	priv->bin.total_time += stats.total_time;
 	priv->bin.busy_time += stats.busy_time;
-	if ((unsigned int) priv->bin.busy_time < MIN_BUSY)
-		busy_bcounter = 0;
+
+	set_busy_boost_counter(priv->bin.busy_time);
 
 	if (busy_bcounter) {
 		unsigned long busy_btime = get_busy_boost(stats.busy_time);
@@ -414,9 +437,6 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 		pr_err(TAG "bad freq %ld\n", stats.current_frequency);
 		return level;
 	}
-
-	if (busy_bcounter < busy_bmax)
-		busy_bcounter++;
 
 	/*
 	 * If there is an extended block of busy processing,
