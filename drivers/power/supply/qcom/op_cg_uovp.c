@@ -97,7 +97,7 @@ static int op_cg_current_set(struct op_cg_uovp_data *opdata,
 	while (retries-- > 0) {
 		ret = vote(chg->usb_icl_votable, UOVP_VOTER,
 						true, icl_ua);
-		if (ret) {
+		if (ret < 0) {
 			pr_err("can't set charger max current, ret=%d", ret);
 			break;
 		}
@@ -119,6 +119,9 @@ static int op_cg_current_set(struct op_cg_uovp_data *opdata,
 		}
 
 		power_supply_changed(chg->usb_psy);
+
+		/* Let the ICL vote settle */
+		msleep(500);
 		break;
 	}
 
@@ -196,24 +199,53 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 	return ret;
 }
 
+static bool op_cg_evaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
+{
+	bool is_uovp;
+
+	if (hyst)
+		opdata->is_overvolt = !(opdata->vchg_mv < CHG_SOFT_OVP_HYST_MV);
+	else
+		opdata->is_overvolt = (opdata->vchg_mv > CHG_SOFT_OVP_MV);
+
+	is_uovp = opdata->is_overvolt;
+	if (!is_uovp) {
+		if (hyst)
+			is_uovp = !(opdata->vchg_mv > CHG_SOFT_UVP_HYST_MV);
+		else
+			is_uovp = (opdata->vchg_mv < CHG_SOFT_UVP_MV);
+	}
+
+	if (is_uovp && !hyst)
+		pr_info("charger is %svoltage voltage=%d", 
+			opdata->is_overvolt ? "over" : "under", opdata->vchg_mv);
+
+	return is_uovp;
+}
+
+static int op_cg_reevaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
+{
+	struct smb_charger *chg = opdata->chg;
+	union power_supply_propval vbus_val;
+	int ret;
+
+	/* Re-evaluate the voltage and increase/decrease the 
+	   voltage again if needed */
+	ret = smblib_get_prop_usb_voltage_now(chg, &vbus_val);
+	if (ret < 0)
+		return ret;
+	opdata->vchg_mv = vbus_val.intval;
+
+	return op_cg_evaluate_uovp(opdata, hyst);
+}
+
 static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-	bool is_uovp;
 	int ret;
 
-	opdata->is_overvolt = (opdata->vchg_mv > CHG_SOFT_OVP_MV);
-
-	is_uovp = opdata->is_overvolt;
-	if (!is_uovp)
-		is_uovp = (opdata->vchg_mv <= CHG_SOFT_UVP_MV);
-
-	if (!is_uovp)
+	if (!op_cg_evaluate_uovp(opdata, false))
 		return;
-
-	pr_info("charger is %svoltage count=%d voltage %d",
-			opdata->is_overvolt ? "over" : "under", 
-			opdata->uovp_cnt, opdata->vchg_mv);
 
 	opdata->uovp_state = true;
 	opdata->not_uovp_cnt = 0;
@@ -222,8 +254,20 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 	if (opdata->last_uovp_state)
 		opdata->uovp_cnt++;
 
-	/* Increase the current if over, decrease if under */
-	ret = op_cg_current_inc_dec(opdata, opdata->is_overvolt);
+	while (1) {
+		/* Increase the current if over, decrease if under */
+		ret = op_cg_current_inc_dec(opdata, opdata->is_overvolt);
+		if (ret < 0)
+			break;
+
+		ret = op_cg_reevaluate_uovp(opdata, false);
+		if (!ret || ret < 0)
+			break;
+	}
+
+	/* We have successfully resolved the UOV */
+	if (!ret)
+		return;
 
 	if (opdata->uovp_cnt <= DETECT_CNT) {
 		pr_info("uovp_cnt=%d", opdata->uovp_cnt);
@@ -231,23 +275,16 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 	}
 
 	/* Only call cutoff if current control fails */
-	if (ret && !chg->chg_ovp)
+	if (!chg->chg_ovp)
 		op_cg_uovp_cutoff(opdata);
 }
 
 static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-	bool is_uovp;
 	int ret;
 
-	opdata->is_overvolt = !(opdata->vchg_mv < CHG_SOFT_OVP_HYST_MV);
-
-	is_uovp = opdata->is_overvolt;
-	if (!is_uovp)
-		is_uovp = !(opdata->vchg_mv > CHG_SOFT_UVP_HYST_MV);
-
-	if (is_uovp)
+	if (op_cg_evaluate_uovp(opdata, true))
 		return;
 
 	opdata->uovp_state = false;
@@ -275,10 +312,17 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 		return;
 	}
 
-	/* Increase the current if not undervolt for @DETECT_CNT iterations
-	   and we're not in timeout */
+	/* Increase the current if not undervolt for @DETECT_CNT 
+	   iterations and we're not in timeout */
 	ret = op_cg_current_inc_dec(opdata, true);
-	if (ret)
+	if (!ret) {
+		/* Timeout if we are under/overvoltage or can't evaluate */
+		if (op_cg_reevaluate_uovp(opdata, false))
+			ret = -ETIMEDOUT;
+	}
+
+	/* Timeout if we failed */
+	if (ret < 0)
 		opdata->not_uovp_timeout = TIMEOUT_CNT;
 }
 
