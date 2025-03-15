@@ -31,9 +31,9 @@
 
 #define TIMEOUT_CNT            5
 
-#define NO_CHARGER_BIT         0
-#define FAST_CHARGER_BITS \
-	(DCP_CHARGER_BIT | FLOAT_CHARGER_BIT | OCP_CHARGER_BIT)
+#define DCP_CHARGER_BITS \
+	(DCP_CHARGER_BIT | FLOAT_CHARGER_BIT | OCP_CHARGER_BIT \
+		| CDP_CHARGER_BIT)
 
 struct op_cg_current_table {
 	int max_icl_ua;
@@ -60,8 +60,7 @@ struct op_cg_uovp_data {
 /* Table of max currents uA with their supported apsd bit */
 static const struct op_cg_current_table op_cg_current_data[] = {
 	{ CURRENT_FLOOR_UA, SDP_CHARGER_BIT   },
-	{ 1500000,          CDP_CHARGER_BIT   },
-	{ 3000000,          FAST_CHARGER_BITS },
+	{ 1500000,          DCP_CHARGER_BITS  },
 };
 
 static struct op_cg_uovp_data op_uovp_data;
