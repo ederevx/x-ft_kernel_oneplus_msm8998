@@ -93,7 +93,7 @@ static void set_busy_boost_counter(unsigned long busy)
 
 	if (busy >= BOOST_CEILING)
 		counter++;
-	else if (busy < BOOST_FLOOR)
+	else if (busy < BOOST_FLOOR && busy >= MIN_BUSY)
 		counter--;
 	else
 		return;
