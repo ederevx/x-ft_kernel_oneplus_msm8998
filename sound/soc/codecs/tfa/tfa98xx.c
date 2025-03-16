@@ -2949,6 +2949,8 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 	}
 
 	if (mute) {
+		pinctrl_select_state(tfa98xx->pinctrl, 
+				tfa98xx->pinctrl_sleep_state);
 		__pm_relax(tfa98xx_wakelock);
 		/* stop DSP only when both playback and capture streams
 		 * are deactivated
@@ -2967,6 +2969,8 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 		tfa98xx->dsp_init = TFA98XX_DSP_INIT_STOPPED;
 		mutex_unlock(&tfa98xx->dsp_lock);
 	} else {
+		pinctrl_select_state(tfa98xx->pinctrl, 
+				tfa98xx->pinctrl_default_state);
 		__pm_stay_awake(tfa98xx_wakelock);
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			tfa98xx->pstream = 1;
@@ -3232,6 +3236,20 @@ static int tfa98xx_parse_dt(struct device *dev, struct tfa98xx *tfa98xx,
 	tfa98xx->irq_gpio =  of_get_named_gpio(np, "irq-gpio", 0);
 	if (tfa98xx->irq_gpio < 0)
 		dev_dbg(dev, "No IRQ GPIO provided.\n");
+
+	tfa98xx->pinctrl = devm_pinctrl_get(dev);
+	if (IS_ERR(tfa98xx->pinctrl)) {
+		dev_err(dev, "%s: pinctrl not defined\n", __func__);
+	} else {
+		tfa98xx->pinctrl_default_state = 
+				pinctrl_lookup_state(tfa98xx->pinctrl, "default");
+		if (IS_ERR(tfa98xx->pinctrl_default_state))
+			pr_err("%s: pinctrl lookup default state failed\n", __func__);
+		tfa98xx->pinctrl_sleep_state = 
+				pinctrl_lookup_state(tfa98xx->pinctrl, "sleep");
+		if (IS_ERR(tfa98xx->pinctrl_sleep_state))
+			pr_err("%s: pinctrl lookup sleep state failed\n", __func__);
+	}
 
 	return 0;
 }
