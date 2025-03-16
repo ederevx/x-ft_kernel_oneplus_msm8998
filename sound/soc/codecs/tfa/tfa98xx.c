@@ -2948,6 +2948,7 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 	}
 
 	if (mute) {
+		regulator_set_mode(bob_power, REGULATOR_MODE_STANDBY);
 		pinctrl_select_state(tfa98xx->pinctrl, 
 				tfa98xx->pinctrl_sleep_state);
 		/* stop DSP only when both playback and capture streams
@@ -2967,6 +2968,7 @@ static int tfa98xx_mute(struct snd_soc_dai *dai, int mute, int stream)
 		tfa98xx->dsp_init = TFA98XX_DSP_INIT_STOPPED;
 		mutex_unlock(&tfa98xx->dsp_lock);
 	} else {
+		regulator_set_mode(bob_power, REGULATOR_MODE_FAST);
 		pinctrl_select_state(tfa98xx->pinctrl, 
 				tfa98xx->pinctrl_default_state);
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
