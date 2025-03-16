@@ -71,7 +71,6 @@ struct pn547_dev {
 	atomic_t irq_enabled;
 	atomic_t read_flag;
 	bool cancel_read;
-	struct wakeup_source nfc_wake_lock;
 #ifdef CONFIG_NFC_PN547_PMC_CLK_REQ
 	struct clk *nfc_clk;
 #endif
@@ -105,7 +104,7 @@ static irqreturn_t pn547_dev_irq_handler(int irq, void *dev_id)
 #if NFC_DEBUG
 	pr_info("pn547 : call\n");
 #endif
-	__pm_wakeup_event(&pn547_dev->nfc_wake_lock, 2000);
+	pm_wakeup_event(&pn547_dev->client->dev, 2000);
 	return IRQ_HANDLED;
 }
 
@@ -573,7 +572,6 @@ static int pn547_probe(struct i2c_client *client,
 	gpio_direction_input(pn547_dev->clk_req_gpio);
 
 	i2c_set_clientdata(client, pn547_dev);
-	wakeup_source_init(&pn547_dev->nfc_wake_lock, "nfc_wake_lock");
 	ret = request_irq(client->irq, pn547_dev_irq_handler,
 			  IRQF_TRIGGER_RISING, "pn547", pn547_dev);
 	if (ret) {
@@ -582,6 +580,9 @@ static int pn547_probe(struct i2c_client *client,
 	}
 	disable_irq_nosync(pn547_dev->client->irq);
 	atomic_set(&pn547_dev->irq_enabled, 0);
+
+	device_init_wakeup(&client->dev, true);
+	device_set_wakeup_capable(&client->dev, true);
 
 	gpio_set_value(pn547_dev->ven_gpio, 1);
 	usleep_range(10000, 11000);
@@ -615,7 +616,6 @@ static int pn547_probe(struct i2c_client *client,
 
 err_request_irq_failed:
 	misc_deregister(&pn547_dev->pn547_device);
-	wakeup_source_trash(&pn547_dev->nfc_wake_lock);
 err_misc_register:
 	mutex_destroy(&pn547_dev->read_mutex);
 	kfree(pn547_dev);
@@ -642,7 +642,6 @@ static int pn547_remove(struct i2c_client *client)
 	if (pn547_dev->nfc_clk)
 		clk_unprepare(pn547_dev->nfc_clk);
 #endif
-	wakeup_source_trash(&pn547_dev->nfc_wake_lock);
 	free_irq(client->irq, pn547_dev);
 	if (nfc_has_pinctrl) {
 		ret = pn547_pinctrl_config(pn547_dev, 0);
