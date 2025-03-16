@@ -84,6 +84,9 @@ struct tfa98xx {
 	struct delayed_work interrupt_work;
 	struct delayed_work tapdet_work;
 	struct mutex dsp_lock;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pinctrl_default_state;
+	struct pinctrl_state *pinctrl_sleep_state;	
 	int dsp_init;
 	int dsp_fw_state;
 	int sysclk;
