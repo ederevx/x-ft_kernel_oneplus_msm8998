@@ -79,17 +79,23 @@ struct pn547_dev {
 	unsigned int pvdd_en_gpio;
 };
 
+static void pn547_irq_toggle(struct pn547_dev *pn547_dev, bool en)
+{
+	if (atomic_read(&pn547_dev->irq_enabled) != en) {
+		atomic_set(&pn547_dev->irq_enabled, en);
+		if (en) {
+			enable_irq(pn547_dev->client->irq);
+			enable_irq_wake(pn547_dev->client->irq);
+		} else {
+			disable_irq_wake(pn547_dev->client->irq);
+			disable_irq_nosync(pn547_dev->client->irq);
+		}
+	}
+}
+
 static irqreturn_t pn547_dev_irq_handler(int irq, void *dev_id)
 {
 	struct pn547_dev *pn547_dev = dev_id;
-
-	if (!gpio_get_value(pn547_dev->irq_gpio)) {
-#if NFC_DEBUG
-		pr_err("%s, irq_gpio = %d\n", __func__,
-			gpio_get_value(pn547_dev->irq_gpio));
-#endif
-		return IRQ_HANDLED;
-	}
 
 	/* Wake up waiting readers */
 	atomic_set(&pn547_dev->read_flag, 1);
@@ -146,23 +152,30 @@ wait_irq:
 #if NFC_DEBUG
 		pr_info("pn547: wait_event_interruptible : in\n");
 #endif
-		if (!gpio_get_value(pn547_dev->irq_gpio))
+		while (1) {
+			pn547_irq_toggle(pn547_dev, true);
+
 			ret = wait_event_interruptible(pn547_dev->read_wq,
 				atomic_read(&pn547_dev->read_flag));
 
+			pn547_irq_toggle(pn547_dev, false);
+
+			if (pn547_dev->cancel_read) {
+				pn547_dev->cancel_read = false;
+				ret = -1;
+				goto fail;
+			}
+
+			if (ret)
+				goto fail;
+
+			if (gpio_get_value(pn547_dev->irq_gpio))
+				break;
+
 #if NFC_DEBUG
-		pr_info("pn547 :   h\n");
+			pr_info("pn547 : spurious intr\n");
 #endif
-
-		if (pn547_dev->cancel_read) {
-			pn547_dev->cancel_read = false;
-			ret = -1;
-			goto fail;
 		}
-
-		if (ret)
-			goto fail;
-
 	}
 
 	/* Read data */
@@ -324,14 +337,8 @@ static long pn547_dev_ioctl(struct file *filp,
 			usleep_range(10000, 10050);
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 1);
 			usleep_range(10000, 10050);
-			if (atomic_read(&pn547_dev->irq_enabled) == 0) {
-				atomic_set(&pn547_dev->irq_enabled, 1);
-				enable_irq(pn547_dev->client->irq);
-				enable_irq_wake(pn547_dev->client->irq);
-			}
 			state = PN547_STATE_FWDL;
-			pr_info("%s power on with firmware, irq=%d\n", __func__,
-				atomic_read(&pn547_dev->irq_enabled));
+			pr_info("%s power on with firmware\n", __func__);
 		} else if (arg == 1) {
 			/* power on */
 			if (pn547_dev->conf_gpio)
@@ -339,23 +346,11 @@ static long pn547_dev_ioctl(struct file *filp,
 			gpio_set_value(pn547_dev->firm_gpio, 0);
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 1);
 			usleep_range(10000, 10050);
-			if (atomic_read(&pn547_dev->irq_enabled) == 0) {
-				atomic_set(&pn547_dev->irq_enabled, 1);
-				enable_irq(pn547_dev->client->irq);
-				enable_irq_wake(pn547_dev->client->irq);
-			}
 			state = PN547_STATE_ON;
-			pr_info("%s power on, irq=%d\n", __func__,
-				atomic_read(&pn547_dev->irq_enabled));
+			pr_info("%s power on\n", __func__);
 		} else if (arg == 0) {
 			/* power off */
-			if (atomic_read(&pn547_dev->irq_enabled) == 1) {
-				atomic_set(&pn547_dev->irq_enabled, 0);
-				disable_irq_wake(pn547_dev->client->irq);
-				disable_irq_nosync(pn547_dev->client->irq);
-			}
-			pr_info("%s power off, irq=%d\n", __func__,
-				atomic_read(&pn547_dev->irq_enabled));
+			pr_info("%s power off\n", __func__);
 			gpio_set_value(pn547_dev->firm_gpio, 0);
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 0);
 			usleep_range(10000, 10050);
