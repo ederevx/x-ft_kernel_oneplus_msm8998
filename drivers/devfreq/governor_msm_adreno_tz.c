@@ -381,7 +381,7 @@ static inline int devfreq_get_freq_level(struct devfreq *devfreq,
 }
 
 #ifdef CONFIG_UCLAMP_TASK_GROUP
-void ucassist_input_trigger_ext(void);
+void ucassist_input_trigger_ext(unsigned long timeout_ms);
 #endif
 
 static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
@@ -422,7 +422,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 #ifdef CONFIG_UCLAMP_TASK_GROUP
 	/* Don't throttle CPU if there is significant GPU load */
 	if (priv->bin.busy_time > CEILING)
-		ucassist_input_trigger_ext();
+		ucassist_input_trigger_ext(1000);
 #endif
 
 	if (stats.private_data)
