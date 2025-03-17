@@ -105,8 +105,8 @@ int cpu_ucassist_init_values(struct cgroup_subsys_state *css)
 	return 0;
 }
 
-/* Disable UCLAMP scaling for 1 second after last input */
-#define UCASSIST_TIMER_JIFFIES msecs_to_jiffies(1000)
+/* Disable UCLAMP scaling for 3 seconds after last input event */
+#define INPUT_EVENT_TIMEOUT_MS 3000
 
 #define SCHED_CAPACITY_SCALE_PERC(perc) \
 		((SCHED_CAPACITY_SCALE * perc) / 100)
@@ -135,32 +135,47 @@ static void ucassist_input_timer_func(unsigned long data)
 }
 static DEFINE_TIMER(ucassist_input_timer, ucassist_input_timer_func, 0, 0);
 
-static inline void ucassist_input_trigger_timer(void)
+static inline int ucassist_input_set_timeout(unsigned long timeout)
 {
-	static DEFINE_SPINLOCK(input_lock);
+	static unsigned long stored_timeout = 0;
+	static DEFINE_RAW_SPINLOCK(set_lock);
 	unsigned long flags;
 
-	if (!spin_trylock_irqsave(&input_lock, flags))
+	raw_spin_lock_irqsave(&set_lock, flags);
+	if (stored_timeout >= timeout) {
+		raw_spin_unlock_irqrestore(&set_lock, flags);
+		return -EALREADY;
+	}
+
+	/* Proceed if the timeout was updated by this thread */
+	stored_timeout = timeout;
+	raw_spin_unlock_irqrestore(&set_lock, flags);
+	return 0;
+}
+
+static inline void ucassist_input_trigger_timer(unsigned long timeout_ms)
+{
+	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
+
+	if (ucassist_input_set_timeout(timeout))
 		return;
 
-	if (!mod_timer(&ucassist_input_timer, jiffies + UCASSIST_TIMER_JIFFIES)) {
+	if (!mod_timer(&ucassist_input_timer, timeout)) {
 		clear_bit(INPUT_SLEEP_STATE, &ucassist_sleep_states);
 		pr_debug("input timer set\n");
 	}
-
-	spin_unlock_irqrestore(&input_lock, flags);
 }
 
-void ucassist_input_trigger_ext(void)
+void ucassist_input_trigger_ext(unsigned long timeout_ms)
 {
-	ucassist_input_trigger_timer();
+	ucassist_input_trigger_timer(timeout_ms);
 }
 EXPORT_SYMBOL(ucassist_input_trigger_ext);
 
 static void ucassist_input_event(struct input_handle *handle,
 		unsigned int type, unsigned int code, int value)
 {
-	ucassist_input_trigger_timer();
+	ucassist_input_trigger_timer(INPUT_EVENT_TIMEOUT_MS);
 }
 
 static int ucassist_input_connect(struct input_handler *handler,
@@ -253,7 +268,7 @@ static int ucassist_fb_notifier_callback(struct notifier_block *self,
 	if (*blank == FB_BLANK_UNBLANK) {
 		clear_bit(FB_SLEEP_STATE, &ucassist_sleep_states);
 		/* Trigger input as well to prevent capping wake performance */
-		ucassist_input_trigger_timer();
+		ucassist_input_trigger_timer(INPUT_EVENT_TIMEOUT_MS);
 	} else if (*blank == FB_BLANK_POWERDOWN) {
 		set_bit(FB_SLEEP_STATE, &ucassist_sleep_states);
 	}
