@@ -59,8 +59,8 @@ static DEFINE_SPINLOCK(suspend_lock);
  */
 #define BOOST_MAX		4
 #define BOOST_PERC		20 /* divided by 100 */
-#define BOOST_CEILING		(CEILING / 2) /* 25msec */
-#define BOOST_FLOOR		(CEILING / 4) /* 12.5msec */
+#define BOOST_CEILING		CEILING /* 50msec */
+#define BOOST_FLOOR		(CEILING / 2) /* 25msec */
 
 #define TZ_RESET_ID		0x3
 #define TZ_UPDATE_ID		0x4
