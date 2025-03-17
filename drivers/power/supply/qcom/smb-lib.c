@@ -5305,6 +5305,9 @@ static void check_dash_status(struct work_struct *work)
 	/* Disable USBIN collapse */
 	op_set_collapse_fet(g_chg, true);
 
+	/* Make sure we do not have any overrides or suspend configured */
+	smblib_set_icl_current(g_chg, INT_MAX);
+
 	while (1) {
 		/* Try to rerun AICL as it may be possible that current 
 		   configuration is incorrect */
@@ -5365,14 +5368,6 @@ static void check_dash_status(struct work_struct *work)
 not_charging:
 	pr_warn("fully switch to normal");
 	set_dash_charger_present(false);
-
-	/* Changing may have collapsed, let's make use of the 
-	   undervoltage boost back WA by OnePlus to recover */
-	g_chg->revert_boost_trigger = true;
-	vote(g_chg->usb_icl_votable, BOOST_BACK_VOTER, true, 0);
-	schedule_delayed_work(&g_chg->recovery_suspend_work,
-		msecs_to_jiffies(TIME_100MS));
-
 	op_set_collapse_fet(g_chg, false);
 }
 DECLARE_WORK(check_dash_status_work, check_dash_status);
