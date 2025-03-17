@@ -419,6 +419,12 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 			stats.busy_time = stats.total_time;
 	}
 
+#ifdef CONFIG_UCLAMP_TASK_GROUP
+	/* Don't throttle CPU if there is significant GPU load */
+	if (priv->bin.busy_time > CEILING)
+		ucassist_input_trigger_ext();
+#endif
+
 	if (stats.private_data)
 		context_count =  *((int *)stats.private_data);
 
@@ -441,11 +447,6 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 		pr_err(TAG "bad freq %ld\n", stats.current_frequency);
 		return level;
 	}
-
-#ifdef CONFIG_UCLAMP_TASK_GROUP
-	/* Don't throttle CPU if we're planning to raise GPU freq */
-	ucassist_input_trigger_ext();
-#endif
 
 	/*
 	 * If there is an extended block of busy processing,
