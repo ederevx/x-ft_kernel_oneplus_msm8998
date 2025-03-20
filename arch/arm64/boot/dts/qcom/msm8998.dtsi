@@ -337,7 +337,7 @@
 		removed_region2: removed_region2@86200000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x86200000 0x0 0x3300000>;
+			reg = <0x0 0x86200000 0x0 0x2d00000>;
 		};
 
 		pil_ipa_gpu_mem: pil_ipa_gpu_region@95200000 {
