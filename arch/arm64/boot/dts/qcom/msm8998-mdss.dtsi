@@ -656,14 +656,8 @@
 		interrupt-parent = <&mdss_mdp>;
 		interrupts = <2 0>;
 
-		/* Offline rotator QoS setting */
+		/* VBIF QoS remapper settings*/
 		qcom,mdss-rot-vbif-qos-setting = <1 1 1 1>;
-		qcom,mdss-rot-xin-id = <14 15>;
-		qcom,mdss-rot-vbif-memtype = <3 3>;
-		qcom,mdss-rot-cdp-setting = <1 1>;
-		qcom,mdss-rot-qos-lut = <0x0 0x0 0x0 0x0>;
-		qcom,mdss-rot-danger-lut = <0x0 0x0>;
-		qcom,mdss-rot-safe-lut = <0x0000ffff 0x0000ffff>;
 
 		qcom,mdss-default-ot-rd-limit = <32>;
 		qcom,mdss-default-ot-wr-limit = <32>;
