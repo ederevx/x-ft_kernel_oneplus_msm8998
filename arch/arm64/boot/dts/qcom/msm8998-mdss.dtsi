@@ -669,7 +669,7 @@
 		qcom,mdss-default-ot-wr-limit = <32>;
 
 		/* reg bus scale settings */
-		mdss_rot_reg: qcom,mdss-rot-reg-bus {
+		rot_reg: qcom,rot-reg-bus {
 			qcom,msm-bus,name = "mdss_rot_reg";
 			qcom,msm-bus,num-cases = <2>;
 			qcom,msm-bus,num-paths = <1>;
