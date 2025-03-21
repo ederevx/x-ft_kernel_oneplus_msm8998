@@ -424,6 +424,10 @@ static const struct qcom_reset_map gpucc_msm8998_early_resets[] = {
 	[GPU_GX_BCR] = { 0x1090 },
 };
 
+static struct clk_hw *gpucc_msm8998_hws[] = {
+	[CRC_DIV_CLK] = &crc_div.hw,
+};
+
 static const struct regmap_config gpucc_msm8998_regmap_config = {
 	.reg_bits	= 32,
 	.reg_stride	= 4,
@@ -436,6 +440,8 @@ static const struct qcom_cc_desc gpucc_msm8998_desc = {
 	.config = &gpucc_msm8998_regmap_config,
 	.clks = gpucc_msm8998_clocks,
 	.num_clks = ARRAY_SIZE(gpucc_msm8998_clocks),
+	.hwclks = gpucc_msm8998_hws,
+	.num_hwclks = ARRAY_SIZE(gpucc_msm8998_hws),
 };
 
 int gpucc_msm8998_probe(struct platform_device *pdev)
@@ -455,13 +461,6 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 	if (IS_ERR(base)) {
 		dev_err(&pdev->dev, "Unable to map GFX3D clock controller.\n");
 		return -EINVAL;
-	}
-
-	/* Register clock fixed factor for CRC divide. */
-	rc = devm_clk_hw_register(&pdev->dev, &crc_div.hw);
-	if (rc) {
-		dev_err(&pdev->dev, "Failed to register hardware clock\n");
-		return rc;
 	}
 
 	regmap = devm_regmap_init_mmio(&pdev->dev, base,

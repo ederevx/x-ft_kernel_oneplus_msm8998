@@ -17,6 +17,8 @@
 #define GFX3D_CLK_SRC		2
 #define GPUCC_GFX3D_CLK		3
 
+#define CRC_DIV_CLK	1
+
 /* EARLY */
 #define GPUCC_XO		0
 #define RBCPR_CLK_SRC		1
