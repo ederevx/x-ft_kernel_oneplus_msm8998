@@ -19,7 +19,7 @@
 #define UOVP_VOTER			"UOVP_VOTER"
 
 #define CURRENT_CEIL_DEFAULT   1500000 /* DCP_CURRENT_UA (normal) = 1.5A */
-#define CURRENT_FLOOR_UA       500000  /* SDP_CURRENT_UA = 500mA */
+#define CURRENT_FLOOR_UA       500000  /* SDP_CURRENT_UA (normal) = 500mA */
 #define CURRENT_DIFF_UA        250000  /* At least 250mA */
 
 #define CHG_HYST_MV            100
@@ -52,6 +52,7 @@ struct op_cg_uovp_data {
 	bool last_uovp_state;
 	bool uovp_state;
 	bool is_overvolt;
+	bool is_sdp;
 
 	bool initialized;
 	bool enable;
@@ -59,7 +60,7 @@ struct op_cg_uovp_data {
 
 /* Table of max currents uA with their supported apsd bit */
 static const struct op_cg_current_table op_cg_current_data[] = {
-	{ CURRENT_FLOOR_UA, SDP_CHARGER_BIT   },
+	{ 900000,           SDP_CHARGER_BIT   },
 	{ 1500000,          DCP_CHARGER_BITS  },
 };
 
@@ -145,6 +146,8 @@ static int op_cg_get_ceil_icl_ua(struct op_cg_uovp_data *opdata)
 		}
 	}
 
+	opdata->is_sdp = !!(apsd_bit & SDP_CHARGER_BIT);
+
 	return ceil_icl_ua;
 }
 
@@ -162,7 +165,7 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 		target_icl_ua = CURRENT_FLOOR_UA;
 
 		while (1) {
-			if (target_icl_ua >= ceil_icl_ua) {
+			if (target_icl_ua >= ceil_icl_ua || opdata->is_sdp) {
 				target_icl_ua = ceil_icl_ua;
 				break;
 			}
@@ -176,7 +179,7 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 		target_icl_ua = ceil_icl_ua;
 
 		while (1) {
-			if (target_icl_ua <= CURRENT_FLOOR_UA) {
+			if (target_icl_ua <= CURRENT_FLOOR_UA || opdata->is_sdp) {
 				target_icl_ua = CURRENT_FLOOR_UA;
 				break;
 			}
@@ -367,6 +370,9 @@ void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
 	if (opdata->initialized == chg_present)
 		return;
 
+	/* Clear data whenever changing states */
+	memset(opdata, 0, sizeof(*opdata));
+
 	if (chg_present) {
 		opdata->chg = chg;
 		opdata->initialized = true;
@@ -374,7 +380,6 @@ void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
 	} else {
 		chg->chg_ovp = false;
 		vote(chg->usb_icl_votable, UOVP_VOTER, false, 0);
-		memset(opdata, 0, sizeof(*opdata));
 		pr_info("UOVP is disabled");
 	}
 }
