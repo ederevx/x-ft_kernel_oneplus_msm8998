@@ -511,7 +511,7 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(13), BIT(13));
 
 	/* Tweak droop detector (GPUCC_GPU_DD_WRAP_CTRL) to reduce leakage */
-	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(0), BIT(0));
+	regmap_write_bits(regmap, 0x430, BIT(0), BIT(0));
 
 	rc = qcom_cc_really_probe(pdev, &gpucc_msm8998_desc, regmap);
 	if (rc) {
