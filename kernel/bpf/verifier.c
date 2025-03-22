@@ -7162,8 +7162,6 @@ int bpf_check(struct bpf_prog **prog, union bpf_attr *attr,
 		if (log->len_total < 128 || log->len_total > UINT_MAX >> 8 ||
 		    !log->level || !log->ubuf)
 			goto err_unlock;
-
-		ret = -ENOMEM;
 	}
 
 	env->strict_alignment = !!(attr->prog_flags & BPF_F_STRICT_ALIGNMENT);
