@@ -17,6 +17,7 @@
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
 #include <linux/videodev2.h>
+#include <linux/backlight.h>
 #include <linux/bootmem.h>
 #include <linux/console.h>
 #include <linux/debugfs.h>
@@ -1410,6 +1411,32 @@ static int mdss_fb_init_panel_modes(struct msm_fb_data_type *mfd,
 	return 0;
 }
 
+/* Wrapper function to send values to led_cdev */
+static int panel_backlight_update_status(struct backlight_device *bl)
+{
+	struct led_classdev *led_cdev = bl_get_data(bl);
+	led_cdev->brightness_set(led_cdev, bl->props.brightness);
+	return 0;
+}
+
+static const struct backlight_ops panel_backlight_ops = {
+	.update_status = panel_backlight_update_status,
+};
+
+static int mdss_fb_panel_backlight_probe(struct platform_device *pdev)
+{
+	struct backlight_properties props;
+	struct backlight_device *bl;
+
+	memset(&props, 0, sizeof(struct backlight_properties));
+	props.brightness = backlight_led.brightness;
+	props.max_brightness = backlight_led.max_brightness;
+	bl = devm_backlight_device_register (&pdev->dev, "panel0-backlight",
+					    &pdev->dev, &backlight_led,
+					    &panel_backlight_ops, &props);
+	return PTR_ERR_OR_ZERO(bl);
+}
+
 static int mdss_fb_probe(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd = NULL;
@@ -1520,6 +1547,8 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	if (!lcd_backlight_registered) {
 		backlight_led.brightness = mfd->panel_info->brightness_max;
 		backlight_led.max_brightness = mfd->panel_info->brightness_max;
+		if (mdss_fb_panel_backlight_probe(pdev))
+			pr_err("panel0-backlight register failed\n");
 		if (led_classdev_register(&pdev->dev, &backlight_led))
 			pr_err("led_classdev_register failed\n");
 		else
