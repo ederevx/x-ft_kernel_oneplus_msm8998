@@ -161,6 +161,10 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 	icl_ua = get_effective_result(chg->usb_icl_votable);
 	pr_info("ceil_icl_ua=%d icl_ua=%d", ceil_icl_ua, icl_ua);
 
+	/* We cannot control the current if !icl_ua */
+	if (!icl_ua)
+		return -EPERM;
+
 	if (increase) {
 		target_icl_ua = CURRENT_FLOOR_UA;
 
