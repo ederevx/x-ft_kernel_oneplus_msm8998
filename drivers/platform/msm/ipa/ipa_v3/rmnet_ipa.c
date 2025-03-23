@@ -47,11 +47,13 @@
  #define OUTSTANDING_HIGH_CTL_DEFAULT (OUTSTANDING_HIGH_DEFAULT + 32)
  #define OUTSTANDING_LOW_DEFAULT 64
  #define WWAN_DATA_LEN 2000
+ #define MAX_NUM_OF_MUX_CHANNEL  10
 #else
  #define OUTSTANDING_HIGH_DEFAULT 256
  #define OUTSTANDING_HIGH_CTL_DEFAULT (OUTSTANDING_HIGH_DEFAULT + 32)
  #define OUTSTANDING_LOW_DEFAULT 128
  #define WWAN_DATA_LEN 9216
+ #define MAX_NUM_OF_MUX_CHANNEL  15
 #endif
 
 static unsigned int outstanding_high = OUTSTANDING_HIGH_DEFAULT;
@@ -71,7 +73,6 @@ MODULE_PARM_DESC(outstanding_low, "Outstanding low");
 #define IPA_RM_INACTIVITY_TIMER 100 /* IPA_RM */
 #define HEADROOM_FOR_QMAP   8 /* for mux header */
 #define TAILROOM            0 /* for padding by mux layer */
-#define MAX_NUM_OF_MUX_CHANNEL  15 /* max mux channels */
 #define UL_FILTER_RULE_HANDLE_START 69
 
 #define IPA_WWAN_DEV_NAME "rmnet_ipa%d"
