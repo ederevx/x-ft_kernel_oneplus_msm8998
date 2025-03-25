@@ -7,6 +7,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/input.h>
@@ -82,7 +83,7 @@ static void switch_dev_report_input(struct input_dev **input,
 
 static void switch_dev_work(struct work_struct *work)
 {
-	int switch_count, i, mode;
+	int switch_count, i, mode, retries = 5;
 	bool switch_state[MODE_MAX_NUM];
 
 	/* This will retain current mode if the GPIO state is indeterminate */
@@ -100,13 +101,13 @@ static void switch_dev_work(struct work_struct *work)
 
 			/* Try again if tri-state is transitioning */
 			if (++switch_count > 1) {
-				cpu_relax();
+				msleep(100);
 				break;
 			}
 
 			mode = i;
 		}
-	} while (switch_count != 1);
+	} while (--retries && switch_count != 1);
 
 	if (mode == switch_data->stored_current_mode)
 		return;
