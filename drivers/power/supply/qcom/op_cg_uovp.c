@@ -18,9 +18,11 @@
 
 #define UOVP_VOTER			"UOVP_VOTER"
 
-#define CURRENT_CEIL_DEFAULT   1500000 /* DCP_CURRENT_UA (normal) = 1.5A */
+#define CURRENT_CEIL_UA        1500000 /* DCP_CURRENT_UA (normal) = 1.5A */
 #define CURRENT_FLOOR_UA       500000  /* SDP_CURRENT_UA (normal) = 500mA */
 #define CURRENT_DELTA_UA       250000  /* At least 250mA */
+
+#define CURRENT_SDP_CEIL_UA    900000  /* SDP_CURRENT_UA (fast) = 900mA */
 
 #define CHG_HYST_MV            100
 #define CHG_SOFT_OVP_HYST_MV   (CHG_SOFT_OVP_MV - CHG_HYST_MV)
@@ -30,15 +32,6 @@
 #define VOTE_RETRIES           3
 
 #define TIMEOUT_CNT            5
-
-#define DCP_CHARGER_BITS \
-	(DCP_CHARGER_BIT | FLOAT_CHARGER_BIT | OCP_CHARGER_BIT \
-		| CDP_CHARGER_BIT)
-
-struct op_cg_current_table {
-	int max_icl_ua;
-	int apsd_bit;
-};
 
 struct op_cg_uovp_data {
 	struct smb_charger *chg;
@@ -50,15 +43,8 @@ struct op_cg_uovp_data {
 
 	bool last_uovp_state;
 	bool is_overvolt;
-	bool is_sdp;
 
 	bool initialized;
-};
-
-/* Table of max currents uA with their supported apsd bit */
-static const struct op_cg_current_table op_cg_current_data[] = {
-	{ 900000,           SDP_CHARGER_BIT   },
-	{ 1500000,          DCP_CHARGER_BITS  },
 };
 
 static struct op_cg_uovp_data op_uovp_data;
@@ -125,51 +111,44 @@ static int op_cg_current_set(struct op_cg_uovp_data *opdata,
 	return ret;
 }
 
-static int op_cg_get_ceil_icl_ua(struct op_cg_uovp_data *opdata)
+/* Evaluate whether chg is SDP according to smblib_set_icl_current */
+static inline bool op_cg_check_sdp_icl(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-	int ceil_icl_ua = CURRENT_CEIL_DEFAULT;
-	int apsd_bit, i;
 
-	/* Make sure we have the latest APSD bit in case it has been rerun */
-	apsd_bit = op_get_apsd_bit(chg);
+	if (chg->typec_mode != POWER_SUPPLY_TYPEC_SOURCE_DEFAULT)
+		return false;
 
-	for (i = ARRAY_SIZE(op_cg_current_data) - 1; i >= 0; i--) {
-		const struct op_cg_current_table *d = &op_cg_current_data[i];
+	if (chg->real_charger_type != POWER_SUPPLY_TYPE_USB)
+		return false;
 
-		if (apsd_bit & d->apsd_bit) {
-			ceil_icl_ua = d->max_icl_ua;
-			break;
-		}
-	}
+	if (chg->non_std_chg_present)
+		return false;
 
-	opdata->is_sdp = !!(apsd_bit & SDP_CHARGER_BIT);
-
-	return ceil_icl_ua;
+	return true;
 }
 
 static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 				bool increase)
 {
 	struct smb_charger *chg = opdata->chg;
-	int ceil_icl_ua, icl_ua, target_icl_ua, ret;
+	int icl_ua, target_icl_ua, ret;
 
-	ceil_icl_ua = op_cg_get_ceil_icl_ua(opdata);
 	icl_ua = get_effective_result(chg->usb_icl_votable);
-	pr_info("ceil_icl_ua=%d icl_ua=%d", ceil_icl_ua, icl_ua);
+	pr_info("icl_ua=%d", icl_ua);
 
 	/* We cannot control the current if !icl_ua */
 	if (!icl_ua)
 		return -EPERM;
 
-	if (!opdata->is_sdp) {
+	if (!op_cg_check_sdp_icl(opdata)) {
 		/* Calculate target ICL as a multiple of CURRENT_DELTA_UA */
 		target_icl_ua = CURRENT_DELTA_UA * DIV_ROUND_UP(icl_ua, CURRENT_DELTA_UA);
 		target_icl_ua += CURRENT_DELTA_UA * (increase ? 1 : -1);
-		target_icl_ua = clamp(target_icl_ua, CURRENT_FLOOR_UA, ceil_icl_ua);
+		target_icl_ua = clamp(target_icl_ua, CURRENT_FLOOR_UA, CURRENT_CEIL_UA);
 	} else {
 		/* We only support 500mA and 900mA for SDP */
-		target_icl_ua = increase ? ceil_icl_ua : CURRENT_FLOOR_UA;
+		target_icl_ua = increase ? CURRENT_SDP_CEIL_UA : CURRENT_FLOOR_UA;
 	}
 
 	if (icl_ua != target_icl_ua) {
@@ -332,10 +311,10 @@ void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
 	if (chg_present) {
 		opdata->chg = chg;
 		opdata->initialized = true;
-		pr_info("UOVP is enabled, apsd_bit=0x%d", op_get_apsd_bit(chg));
 	} else {
 		chg->chg_ovp = false;
 		vote(chg->usb_icl_votable, UOVP_VOTER, false, 0);
-		pr_info("UOVP is disabled");
 	}
+
+	pr_info("UOVP is %s", chg_present ? "enabled" : "disabled");
 }
