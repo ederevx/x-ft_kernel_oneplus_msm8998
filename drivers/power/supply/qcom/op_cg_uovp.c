@@ -49,12 +49,10 @@ struct op_cg_uovp_data {
 	int vchg_mv;
 
 	bool last_uovp_state;
-	bool uovp_state;
 	bool is_overvolt;
 	bool is_sdp;
 
 	bool initialized;
-	bool enable;
 };
 
 /* Table of max currents uA with their supported apsd bit */
@@ -226,13 +224,12 @@ static int op_cg_reevaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
 
 static bool op_cg_evaluate_state_counter(struct op_cg_uovp_data *opdata, bool is_uovp)
 {
-	opdata->uovp_state = is_uovp;
-
 	if (opdata->last_uovp_state == is_uovp)
 		opdata->counter++;
 	else
 		opdata->counter = 0;
 
+	opdata->last_uovp_state = is_uovp;
 	return (opdata->counter > DETECT_CNT);
 }
 
@@ -240,9 +237,6 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
 	int ret;
-
-	if (!op_cg_evaluate_uovp(opdata, false))
-		return;
 
 	while (1) {
 		/* Increase the current if over, decrease if under */
@@ -273,9 +267,6 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
 	int ret;
-
-	if (op_cg_evaluate_uovp(opdata, true))
-		return;
 
 	if (!op_cg_evaluate_state_counter(opdata, false)) {
 		pr_info("normal counter=%d", opdata->counter);
@@ -311,17 +302,6 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 		opdata->not_uovp_timeout = TIMEOUT_CNT;
 }
 
-static void op_cg_handle_uovp(struct op_cg_uovp_data *opdata)
-{
-	op_cg_detect_uovp(opdata);
-
-	/* Check normal if it did not transition from !uovp -> uovp */
-	if (!(opdata->uovp_state && !opdata->last_uovp_state))
-		op_cg_detect_normal(opdata);
-
-	opdata->last_uovp_state = opdata->uovp_state;
-}
-
 void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 {
 	struct op_cg_uovp_data *opdata = &op_uovp_data;
@@ -334,16 +314,13 @@ void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 		return;
 	}
 
-	/* Wait for the charger to settle */
-	if (!opdata->enable) {
-		opdata->enable = true;
-		return;
-	}
-
 	pr_info("vchg_mv=%d", vchg_mv);
-
 	opdata->vchg_mv = vchg_mv;
-	op_cg_handle_uovp(opdata);
+
+	if (op_cg_evaluate_uovp(opdata, false))
+		op_cg_detect_uovp(opdata);
+	else if (!op_cg_evaluate_uovp(opdata, true))
+		op_cg_detect_normal(opdata);
 }
 
 void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
