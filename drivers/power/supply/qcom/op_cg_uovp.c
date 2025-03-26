@@ -20,7 +20,7 @@
 
 #define CURRENT_CEIL_DEFAULT   1500000 /* DCP_CURRENT_UA (normal) = 1.5A */
 #define CURRENT_FLOOR_UA       500000  /* SDP_CURRENT_UA (normal) = 500mA */
-#define CURRENT_DIFF_UA        250000  /* At least 250mA */
+#define CURRENT_DELTA_UA       250000  /* At least 250mA */
 
 #define CHG_HYST_MV            100
 #define CHG_SOFT_OVP_HYST_MV   (CHG_SOFT_OVP_MV - CHG_HYST_MV)
@@ -43,8 +43,7 @@ struct op_cg_current_table {
 struct op_cg_uovp_data {
 	struct smb_charger *chg;
 
-	int uovp_cnt;
-	int not_uovp_cnt;
+	int counter;
 
 	int not_uovp_timeout;
 	int vchg_mv;
@@ -165,34 +164,14 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 	if (!icl_ua)
 		return -EPERM;
 
-	if (increase) {
-		target_icl_ua = CURRENT_FLOOR_UA;
-
-		while (1) {
-			if (target_icl_ua >= ceil_icl_ua || opdata->is_sdp) {
-				target_icl_ua = ceil_icl_ua;
-				break;
-			}
-
-			if (target_icl_ua >= icl_ua + CURRENT_DIFF_UA)
-				break;
-
-			target_icl_ua += CURRENT_DIFF_UA;
-		}
+	if (!opdata->is_sdp) {
+		/* Calculate target ICL as a multiple of CURRENT_DELTA_UA */
+		target_icl_ua = CURRENT_DELTA_UA * DIV_ROUND_UP(icl_ua, CURRENT_DELTA_UA);
+		target_icl_ua += CURRENT_DELTA_UA * (increase ? 1 : -1);
+		target_icl_ua = clamp(target_icl_ua, CURRENT_FLOOR_UA, ceil_icl_ua);
 	} else {
-		target_icl_ua = ceil_icl_ua;
-
-		while (1) {
-			if (target_icl_ua <= CURRENT_FLOOR_UA || opdata->is_sdp) {
-				target_icl_ua = CURRENT_FLOOR_UA;
-				break;
-			}
-
-			if (target_icl_ua <= icl_ua - CURRENT_DIFF_UA)
-				break;
-
-			target_icl_ua -= CURRENT_DIFF_UA;
-		}
+		/* We only support 500mA and 900mA for SDP */
+		target_icl_ua = increase ? ceil_icl_ua : CURRENT_FLOOR_UA;
 	}
 
 	if (icl_ua != target_icl_ua) {
@@ -245,6 +224,18 @@ static int op_cg_reevaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
 	return op_cg_evaluate_uovp(opdata, hyst);
 }
 
+static bool op_cg_evaluate_state_counter(struct op_cg_uovp_data *opdata, bool is_uovp)
+{
+	opdata->uovp_state = is_uovp;
+
+	if (opdata->last_uovp_state == is_uovp)
+		opdata->counter++;
+	else
+		opdata->counter = 0;
+
+	return (opdata->counter > DETECT_CNT);
+}
+
 static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
@@ -252,13 +243,6 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 
 	if (!op_cg_evaluate_uovp(opdata, false))
 		return;
-
-	opdata->uovp_state = true;
-	opdata->not_uovp_cnt = 0;
-	opdata->not_uovp_timeout = 0;
-
-	if (opdata->last_uovp_state)
-		opdata->uovp_cnt++;
 
 	while (1) {
 		/* Increase the current if over, decrease if under */
@@ -275,8 +259,8 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 	if (!ret)
 		return;
 
-	if (opdata->uovp_cnt <= DETECT_CNT) {
-		pr_info("uovp_cnt=%d", opdata->uovp_cnt);
+	if (!op_cg_evaluate_state_counter(opdata, true)) {
+		pr_info("uovp counter=%d", opdata->counter);
 		return;
 	}
 
@@ -293,14 +277,8 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 	if (op_cg_evaluate_uovp(opdata, true))
 		return;
 
-	opdata->uovp_state = false;
-	opdata->uovp_cnt = 0;
-
-	if (!opdata->last_uovp_state)
-		opdata->not_uovp_cnt++;
-
-	if (opdata->not_uovp_cnt <= DETECT_CNT) {
-		pr_info("not_uovp_cnt=%d", opdata->not_uovp_cnt);
+	if (!op_cg_evaluate_state_counter(opdata, false)) {
+		pr_info("normal counter=%d", opdata->counter);
 		return;
 	}
 
@@ -310,7 +288,8 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 		return;
 	}
 
-	opdata->not_uovp_cnt = 0;
+	/* Reset the counter if we will increase the current */
+	opdata->counter = 0;
 
 	/* Wait for timeout to be cleared before trying again */
 	if (opdata->not_uovp_timeout > 0) {
