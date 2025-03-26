@@ -184,19 +184,15 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 
 static bool op_cg_evaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
 {
+	int target_vchg_mv;
 	bool is_uovp;
 
-	if (hyst)
-		opdata->is_overvolt = !(opdata->vchg_mv < CHG_SOFT_OVP_HYST_MV);
-	else
-		opdata->is_overvolt = (opdata->vchg_mv > CHG_SOFT_OVP_MV);
+	target_vchg_mv = hyst ? CHG_SOFT_OVP_HYST_MV : CHG_SOFT_OVP_MV;
+	is_uovp = opdata->is_overvolt = (opdata->vchg_mv >= target_vchg_mv);
 
-	is_uovp = opdata->is_overvolt;
 	if (!is_uovp) {
-		if (hyst)
-			is_uovp = !(opdata->vchg_mv > CHG_SOFT_UVP_HYST_MV);
-		else
-			is_uovp = (opdata->vchg_mv < CHG_SOFT_UVP_MV);
+		target_vchg_mv = hyst ? CHG_SOFT_UVP_HYST_MV : CHG_SOFT_UVP_MV;
+		is_uovp = (opdata->vchg_mv <= target_vchg_mv);
 	}
 
 	if (is_uovp && !hyst)
