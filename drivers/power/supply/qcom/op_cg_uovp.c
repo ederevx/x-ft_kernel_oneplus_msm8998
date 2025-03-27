@@ -22,7 +22,8 @@
 #define CURRENT_FLOOR_UA       500000  /* SDP_CURRENT_UA (normal) = 500mA */
 #define CURRENT_DELTA_UA       250000  /* At least 250mA */
 
-#define CURRENT_SDP_CEIL_UA    900000  /* SDP_CURRENT_UA (fast) = 900mA */
+#define CURRENT_SDP_CEIL_UA    500000  /* SDP_CURRENT_UA (normal) = 500mA */
+#define CURRENT_SDP_FLOOR_UA   100000  /* SDP_CURRENT_UA (slow) = 100mA */
 
 #define CHG_HYST_MV            100
 #define CHG_SOFT_OVP_HYST_MV   (CHG_SOFT_OVP_MV - CHG_HYST_MV)
@@ -133,8 +134,8 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 		target_icl_ua += CURRENT_DELTA_UA * (increase ? 1 : -1);
 		target_icl_ua = clamp(target_icl_ua, CURRENT_FLOOR_UA, CURRENT_CEIL_UA);
 	} else {
-		/* We only support 500mA and 900mA for SDP */
-		target_icl_ua = increase ? CURRENT_SDP_CEIL_UA : CURRENT_FLOOR_UA;
+		/* We only support 500mA and 100mA for SDP */
+		target_icl_ua = increase ? CURRENT_SDP_CEIL_UA : CURRENT_SDP_FLOOR_UA;
 	}
 
 	if (icl_ua != target_icl_ua) {
