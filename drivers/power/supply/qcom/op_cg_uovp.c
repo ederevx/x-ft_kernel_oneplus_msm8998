@@ -29,7 +29,6 @@
 #define CHG_SOFT_UVP_HYST_MV   (CHG_SOFT_UVP_MV + CHG_HYST_MV)
 
 #define DETECT_CNT             3
-#define VOTE_RETRIES           3
 
 #define TIMEOUT_CNT            5
 
@@ -74,41 +73,28 @@ static int op_cg_current_set(struct op_cg_uovp_data *opdata,
 {
 	struct smb_charger *chg = opdata->chg;
 	int curr_icl_ua;
-	int ret = 0;
-	int retries = VOTE_RETRIES;
+	int ret;
 
-	while (retries-- > 0) {
-		ret = vote(chg->usb_icl_votable, UOVP_VOTER,
-						true, icl_ua);
-		if (ret < 0) {
-			pr_err("can't set charger max current, ret=%d", ret);
-			break;
-		}
-
-		/* Ensure we get the latest vote result */
-		rerun_election(chg->usb_icl_votable);
-
-		curr_icl_ua = get_effective_result(chg->usb_icl_votable);
-		if (curr_icl_ua != icl_ua) {
-			pr_err("current icl ua does not match vote, rerun AICL");
-			ret = -EINVAL;
-
-			/* Rerun AICL if we're not able to change effective 
-			   vote then try again */
-			vote(chg->usb_icl_votable, UOVP_VOTER, false, 0);
-			smblib_rerun_aicl(chg);
-			msleep(500);
-			continue;
-		}
-
-		power_supply_changed(chg->usb_psy);
-
-		/* Let the ICL vote settle */
-		msleep(500);
-		break;
+	ret = vote(chg->usb_icl_votable, UOVP_VOTER, true, icl_ua);
+	if (ret < 0) {
+		pr_err("can't vote for USB ICL, ret=%d", ret);
+		return ret;
 	}
 
-	return ret;
+	/* Ensure we get the latest vote result */
+	rerun_election(chg->usb_icl_votable);
+
+	curr_icl_ua = get_effective_result(chg->usb_icl_votable);
+	if (curr_icl_ua != icl_ua) {
+		pr_err("current icl ua does not match vote");
+		return -EINVAL;
+	}
+
+	power_supply_changed(chg->usb_psy);
+
+	/* Let the ICL vote settle */
+	msleep(500);
+	return 0;
 }
 
 /* Evaluate whether chg is SDP according to smblib_set_icl_current */
@@ -175,8 +161,8 @@ static bool op_cg_evaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
 	}
 
 	if (is_uovp && !hyst)
-		pr_info("charger is %svoltage voltage=%d", 
-			opdata->is_overvolt ? "over" : "under", opdata->vchg_mv);
+		pr_info("charger is %svoltage", opdata->is_overvolt ? 
+				"over" : "under", opdata->vchg_mv);
 
 	return is_uovp;
 }
