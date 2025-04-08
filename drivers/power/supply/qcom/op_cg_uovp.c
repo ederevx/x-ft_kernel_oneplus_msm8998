@@ -48,6 +48,7 @@ struct op_cg_uovp_data {
 };
 
 static struct op_cg_uovp_data op_uovp_data;
+static DEFINE_MUTEX(op_uovp_data_lock);
 
 static void op_cg_uovp_cutoff(struct op_cg_uovp_data *opdata)
 {
@@ -152,6 +153,9 @@ static bool op_cg_evaluate_uovp(struct op_cg_uovp_data *opdata, bool hyst)
 {
 	int target_vchg_mv;
 	bool is_uovp;
+
+	if (!opdata->chg->vbus_present)
+		return false;
 
 	target_vchg_mv = hyst ? CHG_SOFT_OVP_HYST_MV : CHG_SOFT_OVP_MV;
 	is_uovp = opdata->is_overvolt = (opdata->vchg_mv >= target_vchg_mv);
@@ -268,11 +272,15 @@ void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 {
 	struct op_cg_uovp_data *opdata = &op_uovp_data;
 
-	if (!opdata->initialized)
-		return;
-
 	if (!chg->vbus_present) {
 		pr_info("no vbus present, skip uovp");
+		return;
+	}
+
+	mutex_lock(&op_uovp_data_lock);
+
+	if (!opdata->initialized) {
+		mutex_unlock(&op_uovp_data_lock);
 		return;
 	}
 
@@ -283,6 +291,8 @@ void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 		op_cg_detect_uovp(opdata);
 	else if (!op_cg_evaluate_uovp(opdata, true))
 		op_cg_detect_normal(opdata);
+
+	mutex_unlock(&op_uovp_data_lock);
 }
 
 void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
@@ -291,6 +301,8 @@ void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
 
 	if (opdata->initialized == chg_present)
 		return;
+
+	mutex_lock(&op_uovp_data_lock);
 
 	/* Clear data whenever changing states */
 	memset(opdata, 0, sizeof(*opdata));
@@ -302,6 +314,8 @@ void op_cg_uovp_enable(struct smb_charger *chg, bool chg_present)
 		chg->chg_ovp = false;
 		vote(chg->usb_icl_votable, UOVP_VOTER, false, 0);
 	}
+
+	mutex_unlock(&op_uovp_data_lock);
 
 	pr_info("UOVP is %s", chg_present ? "enabled" : "disabled");
 }
