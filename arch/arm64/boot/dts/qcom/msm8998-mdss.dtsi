@@ -366,7 +366,6 @@
 				qcom,supply-max-voltage = <880000>;
 				qcom,supply-enable-load = <73400>;
 				qcom,supply-disable-load = <32>;
-				qcom,supply-lp-mode-disable-allowed;
 			};
 		};
 
