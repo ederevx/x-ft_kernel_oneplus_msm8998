@@ -57,6 +57,38 @@
 const union power_supply_propval otg_on = {1,};
 const union power_supply_propval otg_off = {0,};
 
+struct qpnp_pon {
+        struct platform_device  *pdev;
+        struct regmap           *regmap;
+        struct input_dev        *pon_input;
+        struct qpnp_pon_config  *pon_cfg;
+        struct pon_regulator    *pon_reg_cfg;
+        struct list_head        list;
+        struct delayed_work     bark_work;
+        struct delayed_work     press_work;
+        struct work_struct  up_work;
+        atomic_t       press_count;
+        struct dentry           *debugfs;
+        int                     pon_trigger_reason;
+        int                     pon_power_off_reason;
+        int                     num_pon_reg;
+        int                     num_pon_config;
+        u32                     dbc_time_us;
+        u32                     uvlo;
+        int                     warm_reset_poff_type;
+        int                     hard_reset_poff_type;
+        int                     shutdown_poff_type;
+        u16                     base;
+        u8                      subtype;
+        u8                      pon_ver;
+        u8                      warm_reset_reason1;
+        u8                      warm_reset_reason2;
+        bool                    is_spon;
+        bool                    store_hard_reset_reason;
+        bool                    kpdpwr_dbc_enable;
+        ktime_t                 kpdpwr_last_release_time;
+};
+
 struct smb_charger *g_chg;
 struct qpnp_pon *pm_pon;
 
@@ -1248,9 +1280,6 @@ static int __smblib_set_prop_typec_power_role(struct smb_charger *chg,
 		return -EINVAL;
 	}
 
-	if (!chg->otg_switch)
-		power_role = UFP_EN_CMD_BIT;
-
 	if (chg->wa_flags & TYPEC_PBS_WA_BIT) {
 		if (power_role == UFP_EN_CMD_BIT) {
 			/* disable PBS workaround when forcing sink mode */
@@ -2194,20 +2223,6 @@ int smblib_get_prop_charge_qnovo_enable(struct smb_charger *chg,
 
 	val->intval = (bool)(stat & QNOVO_PT_ENABLE_CMD_BIT);
 	return 0;
-}
-
-int smblib_get_prop_from_bms(struct smb_charger *chg,
-                                enum power_supply_property psp,
-                                union power_supply_propval *val)
-{
-        int rc;
-
-        if (!chg->bms_psy)
-                return -EINVAL;
-
-        rc = power_supply_get_property(chg->bms_psy, psp, val);
-
-        return rc;
 }
 
 int smblib_get_prop_batt_charge_counter(struct smb_charger *chg,
@@ -4273,8 +4288,7 @@ static void smblib_force_legacy_icl(struct smb_charger *chg, int pst)
 		*/
 		if (!is_client_vote_enabled(chg->usb_icl_votable,
 			USB_PSY_VOTER))
-			vote(chg->usb_icl_votable, USB_PSY_VOTER, true, 500000);
-
+		vote(chg->usb_icl_votable, USB_PSY_VOTER, true, 500000);
 		vote(chg->usb_icl_votable, LEGACY_UNKNOWN_VOTER, false, 0);
 		break;
 	case POWER_SUPPLY_TYPE_USB_CDP:
@@ -7979,6 +7993,19 @@ int smblib_deinit(struct smb_charger *chg)
 {
 	switch (chg->mode) {
 	case PARALLEL_MASTER:
+		cancel_work_sync(&chg->bms_update_work);
+		cancel_work_sync(&chg->pl_update_work);
+		cancel_work_sync(&chg->rdstd_cc2_detach_work);
+		cancel_delayed_work_sync(&chg->hvdcp_detect_work);
+		cancel_delayed_work_sync(&chg->clear_hdc_work);
+		cancel_work_sync(&chg->otg_oc_work);
+		cancel_work_sync(&chg->vconn_oc_work);
+		cancel_delayed_work_sync(&chg->otg_ss_done_work);
+		cancel_delayed_work_sync(&chg->icl_change_work);
+		cancel_delayed_work_sync(&chg->pl_enable_work);
+		cancel_work_sync(&chg->legacy_detection_work);
+		cancel_delayed_work_sync(&chg->uusb_otg_work);
+		cancel_delayed_work_sync(&chg->bb_removal_work);
 		if (chg->nb.notifier_call)
 			power_supply_unreg_notifier(&chg->nb);
 		smblib_destroy_votables(chg);
