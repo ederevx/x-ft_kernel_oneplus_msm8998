@@ -28,7 +28,6 @@
 #define	FW_CHECK_SUCCESS	1
 
 #define SHOW_FW_VERSION_DELAY_MS 18000
-static struct pm_qos_request big_cpu_update_freq;
 
 struct fastchg_device_info {
 	struct i2c_client		*client;
@@ -626,18 +625,19 @@ static void request_mcu_irq(struct fastchg_device_info *di)
 	if (di->adapter_update_real
 		!= ADAPTER_FW_NEED_UPDATE) {
 		pr_info("%s\n", __func__);
-	if (!di->irq_enabled) {
-		retval = request_irq(di->irq, irq_rx_handler,
-				IRQF_TRIGGER_RISING, "mcu_data", di);
-		if (retval < 0)
-			pr_err("request ap rx irq failed.\n");
-		else
-			di->irq_enabled = true;
-	}
+		if (!di->irq_enabled) {
+			retval = request_irq(di->irq, irq_rx_handler,
+					IRQF_TRIGGER_RISING, "mcu_data", di);
+			if (retval < 0)
+				pr_err("request ap rx irq failed.\n");
+			else
+				di->irq_enabled = true;
+		}
 	} else {
 		di->irq_enabled = true;
+	}
 }
-}
+
 static void fastcg_work_func(struct work_struct *work)
 {
 	struct fastchg_device_info *di = container_of(work,
@@ -795,7 +795,6 @@ static void adapter_update_work_func(struct work_struct *work)
 		clk_set_rate(cnoc_clk, 75000000);
 		clk_prepare_enable(cnoc_clk);
 	}
-	pm_qos_update_request(&big_cpu_update_freq, 0x40);
 	msleep(1000);
 	for (i = 0; i < 3; i++) {
 		update_result =
@@ -827,7 +826,6 @@ static void adapter_update_work_func(struct work_struct *work)
 	oneplus_notify_pmic_check_charger_present();
 	oneplus_notify_dash_charger_present(false);
 	reset_mcu_and_request_irq(chip);
-	//pm_qos_update_request(&big_cpu_update_freq, MIN_CPUFREQ);
 	clk_disable_unprepare(snoc_clk);
 	clk_disable_unprepare(cnoc_clk);
 
@@ -878,7 +876,7 @@ static long  dash_dev_ioctl(struct file *filp, unsigned int cmd,
 	int current_now = 0;
 	int remain_cap = 0;
 
-		switch (cmd) {
+	switch (cmd) {
 		case DASH_NOTIFY_FIRMWARE_UPDATE:
 			schedule_delayed_work(&di->update_firmware,
 					msecs_to_jiffies(2200));
@@ -1172,26 +1170,26 @@ static int dash_pinctrl_init(struct fastchg_device_info *di)
 		return PTR_ERR(di->pinctrl_state_suspended);
 	}
 
-		di->pinctrl_mcu_data_state_active =
-			pinctrl_lookup_state(di->pinctrl,
-					"mcu_data_active");
-		if (IS_ERR_OR_NULL(di->pinctrl_mcu_data_state_active)) {
-			dev_err(&di->client->dev,
-					"Can not mcu_data_active state\n");
-			devm_pinctrl_put(di->pinctrl);
-			di->pinctrl = NULL;
-			return PTR_ERR(di->pinctrl_mcu_data_state_active);
-		}
-		di->pinctrl_mcu_data_state_suspended =
-					pinctrl_lookup_state(di->pinctrl,
-							"mcu_data_suspend");
-		if (IS_ERR_OR_NULL(di->pinctrl_mcu_data_state_suspended)) {
-			dev_err(&di->client->dev,
-					"Can not fastchg_suspend state\n");
-			devm_pinctrl_put(di->pinctrl);
-			di->pinctrl = NULL;
-			return PTR_ERR(di->pinctrl_mcu_data_state_suspended);
-		}
+	di->pinctrl_mcu_data_state_active =
+		pinctrl_lookup_state(di->pinctrl,
+				"mcu_data_active");
+	if (IS_ERR_OR_NULL(di->pinctrl_mcu_data_state_active)) {
+		dev_err(&di->client->dev,
+				"Can not mcu_data_active state\n");
+		devm_pinctrl_put(di->pinctrl);
+		di->pinctrl = NULL;
+		return PTR_ERR(di->pinctrl_mcu_data_state_active);
+	}
+	di->pinctrl_mcu_data_state_suspended =
+				pinctrl_lookup_state(di->pinctrl,
+						"mcu_data_suspend");
+	if (IS_ERR_OR_NULL(di->pinctrl_mcu_data_state_suspended)) {
+		dev_err(&di->client->dev,
+				"Can not fastchg_suspend state\n");
+		devm_pinctrl_put(di->pinctrl);
+		di->pinctrl = NULL;
+		return PTR_ERR(di->pinctrl_mcu_data_state_suspended);
+	}
 
 	if (pinctrl_select_state(di->pinctrl,
 				di->pinctrl_state_active) < 0)
@@ -1251,9 +1249,6 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	INIT_DELAYED_WORK(&di->update_firmware, dashchg_fw_update);
 	INIT_DELAYED_WORK(&di->adapter_update_work, adapter_update_work_func);
 
-	//pm_qos_add_request(&big_cpu_update_freq,
-	//	PM_QOS_C1_CPUFREQ_MIN, MIN_CPUFREQ);
-
 	init_timer(&di->watchdog);
 	di->watchdog.data = (unsigned long)di;
 	di->watchdog.function = di_watchdog;
@@ -1280,7 +1275,6 @@ static int dash_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 
 err_misc_register_failed:
-	pm_qos_remove_request(&big_cpu_update_freq);
 err_read_dt:
 	kfree(di);
 err_check_functionality_failed:
@@ -1303,7 +1297,6 @@ static int dash_remove(struct i2c_client *client)
 		gpio_free(di->ap_clk);
 	if (gpio_is_valid(di->ap_data))
 		gpio_free(di->ap_data);
-	pm_qos_remove_request(&big_cpu_update_freq);
 
 	return 0;
 }
