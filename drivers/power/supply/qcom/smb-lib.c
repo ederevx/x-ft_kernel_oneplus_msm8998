@@ -5267,10 +5267,46 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 	op_battery_temp_region_set(chg, BATT_TEMP_INVALID);
 }
 
+static bool op_get_fast_chg_allow(struct smb_charger *chg);
+
+static void dash_to_normal_workaround(struct smb_charger *chg)
+{
+	u8 cfg_mask;
+
+	/* Return if we're just about to start dash */
+	if (op_get_fast_chg_allow(chg))
+		return;
+
+	/* Return if we're still dash charging */
+	if (is_fastchg_allowed(chg))
+		return;
+
+	pr_info("applying dash to normal workaround");
+
+	/* Reset USBIN collapse and rerun AICL */
+	cfg_mask = SUSPEND_ON_COLLAPSE_USBIN_BIT
+			| USBIN_HV_COLLAPSE_RESPONSE_BIT
+			| USBIN_LV_COLLAPSE_RESPONSE_BIT;
+	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+			cfg_mask, 0);
+
+	smblib_rerun_apsd(chg);
+
+	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+			USBIN_AICL_RERUN_EN_BIT, USBIN_AICL_RERUN_EN_BIT);
+
+	smblib_rerun_aicl(chg);
+
+	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+			cfg_mask, cfg_mask);
+}
+
 int update_dash_unplug_status(void)
 {
 	int rc;
 	union power_supply_propval vbus_val;
+
+	dash_to_normal_workaround(g_chg);
 
 	rc = smblib_get_prop_usb_voltage_now(g_chg, &vbus_val);
 	if (rc < 0)
