@@ -6609,10 +6609,8 @@ static void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 
 		/* Target 100 mV within the safe threshold */
 		if (vbus_val.intval >= (CHG_SOFT_UVP_MV + 100) &&
-			vbus_val.intval <= (CHG_SOFT_OVP_MV - 100)) {
-				op_charging_en(chg, true);
-				break;
-		}
+			vbus_val.intval <= (CHG_SOFT_OVP_MV - 100))
+			break;
 	}
 }
 
