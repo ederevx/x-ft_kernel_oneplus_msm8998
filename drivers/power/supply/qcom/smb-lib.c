@@ -5289,7 +5289,7 @@ static bool get_prop_fast_switch_to_normal(struct smb_charger *chg)
 
 bool is_fastchg_allowed(struct smb_charger *chg)
 {
-	int temp, ret, icl_now_ua = 0;
+	int temp;
 	static int pre_temp;
 	static bool pre_switch_to_normal;
 	bool low_temp_full, switch_to_normal, fw_updated;
@@ -5310,22 +5310,8 @@ bool is_fastchg_allowed(struct smb_charger *chg)
 	}
 
 	switch_to_normal = get_prop_fast_switch_to_normal(chg);
-	pr_info("switch_to_normal =%d\n", switch_to_normal);
-	if (pre_switch_to_normal != switch_to_normal) {
-		ret = smblib_get_icl_current(chg, &icl_now_ua);
-		/* Enable overrides if needed */
-		if (ret == INT_MAX) {
-			smblib_icl_override(chg, true);
-			smblib_get_icl_current(chg, &icl_now_ua);
-			smblib_icl_override(chg, false);
-		}
-		if (icl_now_ua <= USBIN_150MA) {
-			pr_info("Switch to normal charge failed, increasing current limit to 1.5A");
-			smblib_set_icl_current(chg, CDP_CURRENT_UA);
-			op_charging_en(chg, true);
-		}
-	}
-
+	if (pre_switch_to_normal != switch_to_normal)
+		pr_info("switch_to_normal =%d\n", switch_to_normal);
 	if (switch_to_normal)
 		return false;
 
