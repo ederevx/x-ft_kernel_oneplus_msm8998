@@ -30,6 +30,7 @@
 #include "battery.h"
 #include "step-chg-jeita.h"
 #include "storm-watch.h"
+#include "op_cg_uovp.h"
 #if defined(CONFIG_FB)
 #include <linux/notifier.h>
 #include <linux/fb.h>
@@ -40,9 +41,7 @@
 #define SOC_DATA_REG_0          0x88D
 #define HEARTBEAT_INTERVAL_MS   6000
 #define CHG_TIMEOUT_COUNT       6000 /* 10hr */
-#define CHG_SOFT_OVP_MV         5800
 #define BATT_SOFT_OVP_MV        4500
-#define CHG_SOFT_UVP_MV         4300
 #define CHG_VOLTAGE_NORMAL      5000
 #define BATT_REMOVE_TEMP        -400
 #define BATT_TEMP_HYST          20
@@ -86,7 +85,6 @@ struct smb_charger *g_chg;
 struct qpnp_pon *pm_pon;
 
 static struct external_battery_gauge *fast_charger;
-static int op_charging_en(struct smb_charger *chg, bool en);
 static bool set_prop_fast_switch_to_normal_false(struct smb_charger *chg);
 
 static void op_battery_temp_region_set(struct smb_charger *chg,
@@ -2117,7 +2115,6 @@ int smblib_set_prop_chg_protect_status(struct smb_charger *chg,
 }
 
 #define POWER_ROLE_BIT (DFP_EN_CMD_BIT | UFP_EN_CMD_BIT)
-static int op_check_battery_temp(struct smb_charger *chg);
 
 int smblib_set_prop_charge_parameter_set(struct smb_charger *chg)
 {
@@ -5141,7 +5138,7 @@ static int set_property_on_fg(struct smb_charger *chg,
 	return rc;
 }
 
-static int op_charging_en(struct smb_charger *chg, bool en)
+int op_charging_en(struct smb_charger *chg, bool en)
 {
 	int rc;
 
@@ -5247,6 +5244,7 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 	set_prop_fast_switch_to_normal_false(chg);
 	set_usb_switch(chg, false);
 	set_dash_charger_present(false);
+	op_cg_uovp_enable(chg, false);
 
 	chg->chg_ovp = false;
 	chg->dash_on = false;
@@ -6281,7 +6279,7 @@ static int handle_batt_temp_hot(struct smb_charger *chg)
 	return 0;
 }
 
-static int op_check_battery_temp(struct smb_charger *chg)
+int op_check_battery_temp(struct smb_charger *chg)
 {
 	int temp, rc = -1;
 
@@ -6446,61 +6444,6 @@ static void op_check_charger_collapse(struct smb_charger *chg)
 				msecs_to_jiffies(TIME_1000MS));
 		smblib_err(chg, "op_check_charger_collapse done\n");
 	}
-}
-
-static void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
-{
-	static int over_volt_count, not_over_volt_count;
-	static bool uovp_satus, pre_uovp_satus;
-	int detect_time = 3; /* 3 x 6s = 18s */
-
-	if (!chg->vbus_present)
-		return;
-
-	pr_debug("charger_voltage=%d charger_ovp=%d\n", vchg_mv, chg->chg_ovp);
-
-	if (!chg->chg_ovp) {
-		if (vchg_mv > CHG_SOFT_OVP_MV || vchg_mv <= CHG_SOFT_UVP_MV) {
-			pr_err("charger is over voltage, count=%d, voltage %i\n",
-				over_volt_count, vchg_mv);
-			uovp_satus = true;
-			if (pre_uovp_satus)
-				over_volt_count++;
-			else
-				over_volt_count = 0;
-
-			pr_err("uovp_satus=%d,pre_uovp_satus=%d,over_volt_count=%d\n",
-				uovp_satus, pre_uovp_satus, over_volt_count);
-			if (detect_time <= over_volt_count) {
-				/* vchg continuous higher than 5.8v */
-				pr_err("charger is over voltage, stop charging\n");
-				op_charging_en(chg, false);
-				chg->chg_ovp = true;
-			}
-		}
-	} else {
-		if (vchg_mv < CHG_SOFT_OVP_MV - 100
-				&& vchg_mv > CHG_SOFT_UVP_MV + 100) {
-			uovp_satus = false;
-			if (!pre_uovp_satus)
-				not_over_volt_count++;
-			else
-				not_over_volt_count = 0;
-
-			pr_err("uovp_satus=%d, pre_uovp_satus=%d,not_over_volt_count=%d\n",
-				uovp_satus, pre_uovp_satus,
-					not_over_volt_count);
-			if (detect_time <= not_over_volt_count) {
-				/* vchg continuous lower than 5.7v */
-				pr_err("charger voltage is back to normal\n");
-				op_charging_en(chg, true);
-				chg->chg_ovp = false;
-				op_check_battery_temp(chg);
-				smblib_rerun_aicl(chg);
-			}
-		}
-	}
-	pre_uovp_satus = uovp_satus;
 }
 
 #if defined(CONFIG_FB)
@@ -6759,6 +6702,8 @@ static void op_heartbeat_work(struct work_struct *work)
 	}
 
 	charger_present = is_usb_present(chg);
+	op_cg_uovp_enable(chg, charger_present);
+
 	if (!charger_present)
 		goto out;
 
