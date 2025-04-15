@@ -501,7 +501,6 @@ static int fg_get_charge_raw(struct fg_dev *fg, int *val)
 }
 
 #define BATT_SOC_32BIT	GENMASK(31, 0)
-/*
 static int fg_get_charge_counter_shadow(struct fg_dev *fg, int *val)
 {
 	struct fg_gen3_chip *chip = container_of(fg, struct fg_gen3_chip, fg);
@@ -533,7 +532,7 @@ static int fg_get_charge_counter(struct fg_dev *fg, int *val)
 	*val = div_s64((int64_t)cc_soc * chip->cl.learned_cc_uah, CC_SOC_30BIT);
 	return 0;
 }
-*/
+
 static int fg_get_jeita_threshold(struct fg_dev *fg,
 				enum jeita_levels level, int *temp_decidegC)
 {
@@ -2237,7 +2236,7 @@ static void fg_cycle_counter_update(struct fg_dev *fg)
 out:
 	mutex_unlock(&chip->cyc_ctr.lock);
 }
-/*
+
 static int fg_get_cycle_count(struct fg_dev *fg)
 {
 	struct fg_gen3_chip *chip = container_of(fg, struct fg_gen3_chip, fg);
@@ -2254,7 +2253,7 @@ static int fg_get_cycle_count(struct fg_dev *fg)
 	mutex_unlock(&chip->cyc_ctr.lock);
 	return count;
 }
-*/
+
 static void status_change_work(struct work_struct *work)
 {
 	struct fg_dev *fg = container_of(work,
@@ -3378,8 +3377,7 @@ static int fg_psy_get_property(struct power_supply *psy,
 		pval->intval = fg->bp.float_volt_uv;
 		break;
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
-		pval->intval = 0;
-		//pval->intval = fg_get_cycle_count(fg);
+		pval->intval = fg_get_cycle_count(fg);
 		break;
 	case POWER_SUPPLY_PROP_CYCLE_COUNT_ID:
 		pval->intval = chip->cyc_ctr.id;
@@ -3394,12 +3392,10 @@ static int fg_psy_get_property(struct power_supply *psy,
 		pval->intval = chip->cl.learned_cc_uah;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
-		pval->intval = 0;
-		//rc = fg_get_charge_counter(fg, &pval->intval);
+		rc = fg_get_charge_counter(fg, &pval->intval);
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER_SHADOW:
-		pval->intval = 0;
-		//rc = fg_get_charge_counter_shadow(fg, &pval->intval);
+		rc = fg_get_charge_counter_shadow(fg, &pval->intval);
 		break;
 	case POWER_SUPPLY_PROP_TIME_TO_FULL_AVG:
 		rc = fg_get_time_to_full(fg, &pval->intval);
