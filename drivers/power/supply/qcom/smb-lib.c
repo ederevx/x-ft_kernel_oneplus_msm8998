@@ -6561,7 +6561,7 @@ static void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 	pr_err("charger voltage: %d mV, outside range (%d mV, %d mV]\n",
 		vchg_mv, CHG_SOFT_UVP_MV, CHG_SOFT_OVP_MV);
 
-	if (bad_voltage_cnt++ == 5) {
+	if (bad_voltage_cnt++ == 3) {
 		pr_err("charger voltage is still bad; stop charging\n");
 		op_charging_en(chg, false);
 		bad_voltage_cnt = 0;
@@ -6569,13 +6569,6 @@ static void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 	}
 
 	ret = smblib_get_icl_current(chg, &icl_now_ua);
-	/* Enable overrides if needed */
-	if (ret == INT_MAX) {
-		smblib_icl_override(chg, true);
-		ret = smblib_get_icl_current(chg, &icl_now_ua);
-		smblib_icl_override(chg, false);
-	}
-
 	if (ret)
 		return;
 
@@ -6601,7 +6594,7 @@ static void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
 			break;
 
 		/* Wait for the current change to settle */
-		msleep(20);
+		msleep(10);
 
 		ret = smblib_get_prop_usb_voltage_now(chg, &vbus_val);
 		if (ret < 0)
