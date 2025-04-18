@@ -135,21 +135,6 @@ static void ucassist_input_timer_func(unsigned long data)
 }
 static DEFINE_TIMER(ucassist_input_timer, ucassist_input_timer_func, 0, 0);
 
-static void ucassist_update_util(struct work_struct *work)
-{
-	struct rq *rq;
-	unsigned long flags;
-	int cpu;
-
-	for_each_online_cpu(cpu) {
-		rq = cpu_rq(cpu);
-		raw_spin_lock_irqsave(&rq->lock, flags);
-		cpufreq_update_util(rq, 0);
-		raw_spin_unlock_irqrestore(&rq->lock, flags);
-	}
-}
-static DECLARE_WORK(ucassist_update_work, ucassist_update_util);
-
 static inline int ucassist_input_set_timeout(unsigned long timeout)
 {
 	static unsigned long stored_timeout = 0;
@@ -178,7 +163,7 @@ static inline void ucassist_input_trigger_timer(unsigned long timeout_ms)
 	if (!mod_timer(&ucassist_input_timer, timeout)) {
 		clear_bit(INPUT_SLEEP_STATE, &ucassist_sleep_states);
 		pr_debug("input timer set\n");
-		schedule_work(&ucassist_update_work);
+		cpufreq_request_update_util();
 	}
 }
 
