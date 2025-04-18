@@ -2591,8 +2591,11 @@ static inline void cpufreq_update_util(struct rq *rq, unsigned int flags)
 	if (data)
 		data->func(data, clock, flags);
 }
+
+void cpufreq_request_update_util(void);
 #else
 static inline void cpufreq_update_util(struct rq *rq, unsigned int flags) {}
+static inline void cpufreq_request_update_util(void) {}
 #endif /* CONFIG_CPU_FREQ */
 
 /**

@@ -78,3 +78,32 @@ bool cpufreq_this_cpu_can_update(struct cpufreq_policy *policy)
 		(policy->dvfs_possible_from_any_cpu &&
 		 rcu_dereference_sched(*this_cpu_ptr(&cpufreq_update_util_data)));
 }
+
+/**
+ * cpufreq_request_update_util - Request all CPUs to update their utilization.
+ *
+ * This is a function that can be called outside of the core scheduler. 
+ * 
+ * It allows scheduler features that do not deal directly with scheduling but can 
+ * affect perceived CPU utilization, such as UCLAMP, to request CPUs to update their
+ * utilization immediately without needing to call on cpufreq_update_util themselves
+ * for each registered CPU.
+ */
+static void cpufreq_update_util_irq_fn(struct irq_work *irq_work)
+{
+	struct rq *rq;
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		rq = cpu_rq(cpu);
+		raw_spin_lock(&rq->lock);
+		cpufreq_update_util(rq, 0);
+		raw_spin_unlock(&rq->lock);
+	}
+}
+DEFINE_IRQ_WORK(cpufreq_update_util_irq_work, cpufreq_update_util_irq_fn);
+
+void cpufreq_request_update_util(void)
+{
+	irq_work_queue(&cpufreq_update_util_irq_work);
+}
