@@ -653,10 +653,8 @@ static int __clk_rcg2_reconfigure(struct clk_hw *hw)
 	if (!hw_ops->set_rate || !hw_ops->set_parent)
 		return 0;
 
-	/* Reconfigure RCG values at prepare after handoff and 
-	   initial set_rate */
 	rate = clk_hw_get_rate(hw);
-	if (!rate || clk_rcg2_is_enabled(hw))
+	if (!rate || rate == cxo_f.freq)
 		return 0;
 
 	parent_hw = clk_hw_get_parent(hw);
