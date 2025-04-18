@@ -1251,6 +1251,8 @@ uclamp_update_active_tasks(struct cgroup_subsys_state *css)
 
 	/* Trigger UCASSIST whenever we update UCLAMP */
 	ucassist_input_trigger_ext(1000);
+
+	cpufreq_request_update_util();
 }
 
 static void cpu_util_update_eff(struct cgroup_subsys_state *css);
