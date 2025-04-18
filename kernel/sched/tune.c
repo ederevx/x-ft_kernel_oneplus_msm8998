@@ -304,6 +304,9 @@ schedtune_boostgroup_update(int idx, int boost)
 		trace_sched_tune_boostgroup_update(cpu, 0, bg->boost_max);
 	}
 
+	/* Update cpufreq utilization after updating boostgroups */
+	cpufreq_request_update_util();
+
 	return 0;
 }
 
