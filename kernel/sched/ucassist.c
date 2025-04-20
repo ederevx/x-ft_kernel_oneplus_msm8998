@@ -128,9 +128,22 @@ static const unsigned long ucassist_scale_data[] = {
 
 static unsigned long ucassist_sleep_states = 0;
 
+static void ucassist_set_sleep_state(int state, bool set)
+{
+	bool prev;
+
+	if (set)
+		prev = test_and_set_bit(state, &ucassist_sleep_states);
+	else
+		prev = test_and_clear_bit(state, &ucassist_sleep_states);
+
+	if (prev != set)
+		cpufreq_request_update_util();
+}
+
 static void ucassist_input_timer_func(unsigned long data)
 {
-	set_bit(INPUT_SLEEP_STATE, &ucassist_sleep_states);
+	ucassist_set_sleep_state(INPUT_SLEEP_STATE, true);
 	pr_debug("input timer expired\n");
 }
 static DEFINE_TIMER(ucassist_input_timer, ucassist_input_timer_func, 0, 0);
@@ -161,9 +174,8 @@ static inline void ucassist_input_trigger_timer(unsigned long timeout_ms)
 		return;
 
 	if (!mod_timer(&ucassist_input_timer, timeout)) {
-		clear_bit(INPUT_SLEEP_STATE, &ucassist_sleep_states);
+		ucassist_set_sleep_state(INPUT_SLEEP_STATE, false);
 		pr_debug("input timer set\n");
-		cpufreq_request_update_util();
 	}
 }
 
@@ -267,11 +279,11 @@ static int ucassist_fb_notifier_callback(struct notifier_block *self,
 	blank = evdata->data;
 
 	if (*blank == FB_BLANK_UNBLANK) {
-		clear_bit(FB_SLEEP_STATE, &ucassist_sleep_states);
+		ucassist_set_sleep_state(FB_SLEEP_STATE, false);
 		/* Trigger input as well to prevent capping wake performance */
 		ucassist_input_trigger_timer(INPUT_EVENT_TIMEOUT_MS);
 	} else if (*blank == FB_BLANK_POWERDOWN) {
-		set_bit(FB_SLEEP_STATE, &ucassist_sleep_states);
+		ucassist_set_sleep_state(FB_SLEEP_STATE, true);
 	}
 
 	pr_debug("sleep_states = %lu\n", ucassist_sleep_states);
