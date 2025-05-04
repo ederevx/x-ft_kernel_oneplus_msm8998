@@ -351,7 +351,9 @@ static int msm_drm_uninit(struct device *dev)
 	component_unbind_all(dev, ddev);
 
 	sde_dbg_destroy();
+#ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(priv->debug_root);
+#endif
 
 	sde_power_client_destroy(&priv->phandle, priv->pclient);
 	sde_power_resource_deinit(pdev, &priv->phandle);
@@ -750,6 +752,7 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 	if (ret)
 		goto fail;
 
+#ifdef CONFIG_DEBUG_FS
 	priv->debug_root = debugfs_create_dir("debug",
 					ddev->primary->debugfs_root);
 	if (IS_ERR_OR_NULL(priv->debug_root)) {
@@ -758,6 +761,7 @@ static int msm_drm_init(struct device *dev, struct drm_driver *drv)
 		priv->debug_root = NULL;
 		goto fail;
 	}
+#endif
 
 	ret = sde_dbg_debugfs_register(priv->debug_root);
 	if (ret) {

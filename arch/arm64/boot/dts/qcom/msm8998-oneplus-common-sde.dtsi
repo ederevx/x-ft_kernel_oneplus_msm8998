@@ -1,0 +1,107 @@
+/* Copyright (c) 2018, AngeloGioacchino Del Regno <kholk11@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * Copyright (c) 2025, Edrick Vince Sinsuan <sedrickvince@gmail.com>
+ *
+ * This is based on Kholk's work on the Yoshino platform.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2, as
+ * published by the Free Software Foundation.
+ */
+
+/*
+  * Do not remove FBDEV MDSS nodes. The bootloader needs
+  * them to enable continuous splash.
+  *
+  * Removing them is possible, along with losing cont-splash, but
+  * this will initialize the panel only when we enter the OS.
+  */
+ //#include "msm8998-sde-overlay.dtsi"
+ 
+ / {
+	chosen {
+		bootargs = "rcupdate.rcu_expedited=1 kpti=0 rcu_nocbs=0-7 cgroup.memory=nokmem,nosocket msm_drm.dsi_display0=dsi_panel_cmd_display:config0";
+	};
+};
+
+&sde_dsi_samsung_s6e3fa5_1080p_cmd {
+	qcom,platform-reset-gpio = <&tlmm 94 0>;
+	qcom,platform-te-gpio = <&tlmm 11 0>;
+	qcom,platform-vci-gpio = <&tlmm 21 0>;
+	qcom,platform-poc-gpio = <&tlmm 66 0>;
+	qcom,panel-te-source = <0>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+};
+
+&sde_dsi_samsung_s6e3fc1_cmd {
+	qcom,platform-reset-gpio = <&tlmm 94 0>;
+	qcom,platform-te-gpio = <&tlmm 11 0>;
+	qcom,platform-vci-gpio = <&tlmm 21 0>;
+	qcom,platform-poc-gpio = <&tlmm 66 0>;
+	qcom,panel-te-source = <0>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_no_labibb>;
+};
+
+&soc {
+	sde_dsi_panels: qcom,dsi-display@8 {
+		label = "dsi_panel_cmd_display";
+		qcom,display-type = "primary";
+
+		qcom,dsi-ctrl-num = <0>;
+		qcom,dsi-phy-num = <0>;
+
+		qcom,dsi-select-clocks = "mux_byte_clk0", "mux_pixel_clk0";
+
+		qcom,dsi-display-active;
+	};
+
+	/* SDE */
+	dsi_panel_cmd_display: qcom,dsi-display@12 {
+		compatible = "qcom,dsi-display";
+		label = "primary";
+
+		qcom,dsi-ctrl = <&sde_dsi0>;
+		qcom,dsi-phy = <&mdss_dsi_phy0>;
+		clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
+				<&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "mux_byte_clk0", "mux_pixel_clk0";
+
+		pinctrl-names = "panel_active", "panel_suspend";
+		pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+		pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+
+		qcom,platform-reset-gpio = <&tlmm 94 0>;
+		qcom,platform-te-gpio = <&tlmm 11 0>;
+		qcom,platform-vci-gpio = <&tlmm 21 0>;
+		qcom,platform-poc-gpio = <&tlmm 66 0>;
+		qcom,panel-te-source = <0>;
+
+		wqhd-vddio-supply = <&pm8998_l14>;
+
+		qcom,dsi-display-list = <&sde_dsi_panels>;
+	};
+};
+
+&mdss_dp_pll {
+	status = "disabled";
+};
+
+&sde_dsi0 {
+	qcom,cont-splash-enabled;
+};
+
+&sde_kms {
+	/* Set SDE MAX performance */
+	qcom,sde-perf-default-mode = <3>;
+	connectors = <&sde_wb &dsi_panel_cmd_display>;
+};

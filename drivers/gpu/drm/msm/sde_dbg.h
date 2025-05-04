@@ -394,7 +394,7 @@ static inline bool sde_evtlog_is_enabled(struct sde_dbg_evtlog *evtlog,
 
 static inline ssize_t sde_evtlog_dump_to_buffer(struct sde_dbg_evtlog *evtlog,
 		char *evtlog_buf, ssize_t evtlog_buf_size,
-		bool update_last_entry)
+		bool update_last_entry, bool full_dump)
 {
 	return 0;
 }
@@ -418,12 +418,23 @@ static inline void sde_dbg_destroy(void)
 {
 }
 
-static inline void sde_dbg_dump(enum sde_dbg_dump_context,
+static inline void sde_dbg_dump(enum sde_dbg_dump_context mode,
 	const char *name, ...)
 {
 }
 
 static inline void sde_dbg_ctrl(const char *name, ...)
+{
+}
+
+static inline int sde_dbg_reg_register_cb(const char *name, 
+		void (*cb)(void *), void *ptr)
+{
+	return 0;
+}
+
+static inline void sde_dbg_reg_unregister_cb(const char *name, 
+		void (*cb)(void *), void *ptr)
 {
 }
 
@@ -439,7 +450,7 @@ static inline void sde_dbg_reg_register_dump_range(const char *base_name,
 {
 }
 
-void sde_dbg_set_sde_top_offset(u32 blk_off)
+static inline void sde_dbg_set_sde_top_offset(u32 blk_off)
 {
 }
 
@@ -458,7 +469,7 @@ static inline void sde_rsc_debug_dump(u32 mux_sel)
 {
 }
 
-static inline void dsi_ctrl_debug_dump(u32 entries, u32 size)
+static inline void dsi_ctrl_debug_dump(u32 *entries, u32 size)
 {
 }
 

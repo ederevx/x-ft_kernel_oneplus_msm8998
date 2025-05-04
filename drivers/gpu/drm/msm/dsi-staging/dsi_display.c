@@ -1563,6 +1563,7 @@ static const struct file_operations esd_check_mode_fops = {
 static int dsi_display_debugfs_init(struct dsi_display *display)
 {
 	int rc = 0;
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *dir, *dump_file, *misr_data;
 	char name[MAX_NAME_SIZE];
 	int i;
@@ -1680,12 +1681,15 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 error_remove_dir:
 	debugfs_remove(dir);
 error:
+#endif
 	return rc;
 }
 
 static int dsi_display_debugfs_deinit(struct dsi_display *display)
 {
+#ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(display->root);
+#endif
 
 	return 0;
 }
@@ -4999,6 +5003,14 @@ static int dsi_display_sysfs_deinit(struct dsi_display *display)
 
 }
 
+#define WDG_TIME msecs_to_jiffies(30000)
+
+static void display_wdg_func(struct work_struct *work)
+{
+	//panic("TIMEOUT\n");
+}
+static DECLARE_DELAYED_WORK(display_panic_wdg, display_wdg_func);
+
 /**
  * dsi_display_bind - bind dsi device with controlling device
  * @dev:        Pointer to base of platform device
@@ -5022,6 +5034,8 @@ static int dsi_display_bind(struct device *dev,
 	char *client2 = "mdp_event_client";
 	char dsi_client_name[DSI_CLIENT_NAME_SIZE];
 	int i, j, rc = 0;
+
+	schedule_delayed_work(&display_panic_wdg, WDG_TIME);
 
 	if (!dev || !pdev || !master) {
 		pr_err("invalid param(s), dev %pK, pdev %pK, master %pK\n",

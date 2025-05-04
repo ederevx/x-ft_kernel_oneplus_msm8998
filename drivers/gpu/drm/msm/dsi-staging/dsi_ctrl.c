@@ -197,6 +197,7 @@ static int dsi_ctrl_debugfs_init(struct dsi_ctrl *dsi_ctrl,
 				 struct dentry *parent)
 {
 	int rc = 0;
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *dir, *state_file, *reg_dump;
 	char dbg_name[DSI_DEBUG_NAME_LEN];
 
@@ -243,12 +244,15 @@ static int dsi_ctrl_debugfs_init(struct dsi_ctrl *dsi_ctrl,
 error_remove_dir:
 	debugfs_remove(dir);
 error:
+#endif
 	return rc;
 }
 
 static int dsi_ctrl_debugfs_deinit(struct dsi_ctrl *dsi_ctrl)
 {
+#ifdef CONFIG_DEBUG_FS
 	debugfs_remove(dsi_ctrl->debugfs_root);
+#endif
 	return 0;
 }
 
@@ -1986,7 +1990,11 @@ int dsi_ctrl_drv_init(struct dsi_ctrl *dsi_ctrl, struct dentry *parent)
 {
 	int rc = 0;
 
+#ifdef CONFIG_DEBUG_FS
 	if (!dsi_ctrl || !parent) {
+#else
+	if (!dsi_ctrl) {
+#endif
 		pr_err("Invalid params\n");
 		return -EINVAL;
 	}
