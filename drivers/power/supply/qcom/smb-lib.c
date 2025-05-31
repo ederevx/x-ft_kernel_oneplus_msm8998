@@ -5279,103 +5279,54 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 /* Wait for 10 seconds */
 #define DASH_STATUS_WAIT (10 * 1000)
 
-/* SOC is considered to be stuck after 5 minutes */
-#define DASH_STATUS_RETRIES 30
-
-static void check_dash_status(struct work_struct *work)
+static void dash_to_normal_watchdog(struct work_struct *work)
 {
-	union power_supply_propval val;
-	int prev_soc = -1;
-	int status, rc = 0;
-	int retries = 0;
+	struct smb_charger *chg = g_chg;
+	int status;
 	u8 cfg_mask;
 
 	status = get_charging_status();
-	if (status == POWER_SUPPLY_STATUS_CHARGING)
+	if (status == POWER_SUPPLY_STATUS_CHARGING ||
+		status == POWER_SUPPLY_STATUS_DISCHARGING)
 		return;
 
-	rc = smblib_get_prop_from_bms(g_chg, 
-			POWER_SUPPLY_PROP_BQ_SOC, &val);
-	if (rc) {
-		pr_warn("failed to get soc, will not check");
-	} else {
-		pr_info("fastcg full soc=%d", val.intval);
-		prev_soc = val.intval;
+	chg->dash_on = get_prop_fast_chg_started(chg);
+	if (chg->dash_on) {
+		pr_info("dash is online, abort dash_to_normal_watchdog");
+		return;
 	}
 
-	while (1) {
-		g_chg->dash_on = get_prop_fast_chg_started(g_chg);
-		if (g_chg->dash_on) {
-			pr_info("dash is online, abort check_dash_status");
-			return;
-		}
+	pr_warn("not charging, performing smblib corrections");
 
-		pr_warn("not charging, will check dash again after %d ms", 
-				DASH_STATUS_WAIT);
+	/* Reset USBIN collapse and rerun AICL */
+	cfg_mask = SUSPEND_ON_COLLAPSE_USBIN_BIT
+			| USBIN_HV_COLLAPSE_RESPONSE_BIT
+			| USBIN_LV_COLLAPSE_RESPONSE_BIT
+			| USBIN_AICL_RERUN_EN_BIT;
+	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+			cfg_mask, USBIN_AICL_RERUN_EN_BIT);
 
-		/* Reset USBIN collapse and rerun AICL */
-		cfg_mask = SUSPEND_ON_COLLAPSE_USBIN_BIT
-				| USBIN_HV_COLLAPSE_RESPONSE_BIT
-				| USBIN_LV_COLLAPSE_RESPONSE_BIT
-				| USBIN_AICL_RERUN_EN_BIT;
-		smblib_masked_write(g_chg, USBIN_AICL_OPTIONS_CFG_REG,
-				cfg_mask, USBIN_AICL_RERUN_EN_BIT);
+	/* Ensure we notify battery that we switched dash to normal */
+	smblib_set_prop_charge_parameter_set(chg);
 
-		/* Ensure SMB can configure ICL */
-		smblib_masked_write(g_chg, USBIN_ICL_OPTIONS_REG,
-				USBIN_MODE_CHG_BIT, USBIN_MODE_CHG_BIT);
-		smblib_icl_override(g_chg, true);
+	msleep(DASH_STATUS_WAIT);
 
-		/* Ensure we're not getting suspended */
-		smblib_get_usb_suspend(g_chg, &rc);
-		if (rc)
-			smblib_set_usb_suspend(g_chg, false);
+	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+			cfg_mask, cfg_mask & ~USBIN_AICL_RERUN_EN_BIT);
 
-		msleep(DASH_STATUS_WAIT);
+	status = get_charging_status();
+	if (status == POWER_SUPPLY_STATUS_DISCHARGING)
+		return;
 
-		smblib_masked_write(g_chg, USBIN_AICL_OPTIONS_CFG_REG,
-				cfg_mask, cfg_mask & ~USBIN_AICL_RERUN_EN_BIT);
-
-		status = get_charging_status();
-		if (status == POWER_SUPPLY_STATUS_NOT_CHARGING) {
-			pr_warn("still not charging");
-			goto not_charging;
-		}
-
-		if (prev_soc != -1) {
-			rc = smblib_get_prop_from_bms(g_chg, 
-					POWER_SUPPLY_PROP_BQ_SOC, &val);
-			if (rc) {
-				pr_warn("failed to get soc");
-				goto not_charging;
-			}
-
-			if (val.intval == prev_soc) {
-				if (retries >= DASH_STATUS_RETRIES) {
-					pr_warn("soc is not increasing");
-					goto not_charging;
-				}
-				retries++;
-				continue;
-			}
-
-			if (val.intval < prev_soc) {
-				pr_warn("soc dropped");
-				goto not_charging;
-			}
-		}
-
-		break;
+	if (status == POWER_SUPPLY_STATUS_NOT_CHARGING) {
+		pr_warn("still not charging, fully switch to normal");
+		set_dash_charger_present(false);
+		return;
 	}
 
 	pr_info("charging, dash will continue to be present");
-	return;
-
-not_charging:
-	pr_warn("fully switch to normal");
-	set_dash_charger_present(false);
 }
-DECLARE_WORK(check_dash_status_work, check_dash_status);
+DECLARE_WORK(dash_to_normal_watchdog_work, dash_to_normal_watchdog);
 
 int update_dash_unplug_status(void)
 {
@@ -5391,7 +5342,7 @@ int update_dash_unplug_status(void)
 		power_supply_changed(g_chg->usb_psy);
 	}
 
-	schedule_work(&check_dash_status_work);
+	schedule_work(&dash_to_normal_watchdog_work);
 
 	return 0;
 }
