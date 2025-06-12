@@ -3120,14 +3120,6 @@ static int gcc_msm8998_probe(struct platform_device *pdev)
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
 
-	/*
-	 * Set the HMSS_AHB_CLK_SLEEP_ENA bit to allow the hmss_ahb_clk to be
-	 * turned off by hardware during certain apps low power modes.
-	 */
-	ret = regmap_update_bits(regmap, 0x52008, BIT(21), BIT(21));
-	if (ret)
-		return ret;
-
 	vdd_dig.regulator[0] = devm_regulator_get(&pdev->dev, "vdd_dig");
 	if (IS_ERR(vdd_dig.regulator[0])) {
 		if (!(PTR_ERR(vdd_dig.regulator[0]) == -EPROBE_DEFER))
