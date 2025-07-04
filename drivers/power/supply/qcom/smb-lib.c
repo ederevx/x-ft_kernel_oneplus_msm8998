@@ -5276,8 +5276,8 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 	op_battery_temp_region_set(chg, BATT_TEMP_INVALID);
 }
 
-/* Wait for 10 seconds */
-#define DASH_STATUS_WAIT (10 * 1000)
+/* Wait for 5 seconds */
+#define DASH_STATUS_WAIT (5 * 1000)
 
 static void dash_to_normal_watchdog(struct work_struct *work)
 {
@@ -5301,18 +5301,22 @@ static void dash_to_normal_watchdog(struct work_struct *work)
 	/* Reset USBIN collapse and rerun AICL */
 	cfg_mask = SUSPEND_ON_COLLAPSE_USBIN_BIT
 			| USBIN_HV_COLLAPSE_RESPONSE_BIT
-			| USBIN_LV_COLLAPSE_RESPONSE_BIT
-			| USBIN_AICL_RERUN_EN_BIT;
+			| USBIN_LV_COLLAPSE_RESPONSE_BIT;
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
-			cfg_mask, USBIN_AICL_RERUN_EN_BIT);
+			cfg_mask, 0);
 
 	msleep(DASH_STATUS_WAIT);
+
+	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+			USBIN_AICL_RERUN_EN_BIT, USBIN_AICL_RERUN_EN_BIT);
 
 	/* Ensure we notify battery that we switched dash to normal */
 	smblib_set_prop_charge_parameter_set(chg);
 
+	msleep(DASH_STATUS_WAIT);
+
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
-			cfg_mask, cfg_mask & ~USBIN_AICL_RERUN_EN_BIT);
+			cfg_mask, cfg_mask);
 
 	status = get_charging_status();
 	if (status == POWER_SUPPLY_STATUS_DISCHARGING)
