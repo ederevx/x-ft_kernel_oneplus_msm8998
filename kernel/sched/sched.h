@@ -2693,6 +2693,7 @@ static inline unsigned long cpu_util_rt(struct rq *rq)
 #endif
 
 #ifdef CONFIG_UCLAMP_TASK
+int ucassist_get_sleep_state(void);
 void ucassist_sleep_uclamp_scaling(unsigned long *val);
 
 unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id);
@@ -2863,6 +2864,10 @@ static inline bool uclamp_latency_sensitive(struct task_struct *p)
 	if (!css)
 		return false;
 	tg = container_of(css, struct task_group, css);
+
+	/* Disable latency sensitive when sleeping */
+	if (ucassist_get_sleep_state() != -1)
+		return false;
 
 	return tg->latency_sensitive;
 }

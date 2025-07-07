@@ -128,6 +128,19 @@ static const unsigned long ucassist_scale_data[] = {
 
 static unsigned long ucassist_sleep_states = 0;
 
+int ucassist_get_sleep_state(void)
+{
+	int i;
+
+	/* Start from the deepest state towards the shallowest */
+	for (i = MAX_STATES - 1; i >= 0; i--) {
+		if (test_bit(i, &ucassist_sleep_states))
+			return i;
+	}
+
+	return -1;
+}
+
 static void ucassist_set_sleep_state(int state, bool set)
 {
 	bool prev;
@@ -298,19 +311,15 @@ static struct notifier_block ucassist_fb_notif = {
 
 void ucassist_sleep_uclamp_scaling(unsigned long *val)
 {
-	int i;
+	int state;
 
 	if (!*val)
 		return;
 
-	/* Start from the deepest state towards the shallowest */
-	for (i = MAX_STATES - 1; i >= 0; i--) {
-		if (test_bit(i, &ucassist_sleep_states)) {
-			/* Apply a ceiling limit to the UCLAMP value */
-			*val = min(*val, ucassist_scale_data[i]);
-			break;
-		}
-	}
+	/* Apply a ceiling limit to the UCLAMP value */
+	state = ucassist_get_sleep_state();
+	if (state != -1)
+		*val = min(*val, ucassist_scale_data[state]);
 }
 
 static int __init ucassist_init(void)
