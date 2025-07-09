@@ -5305,13 +5305,14 @@ static void dash_to_normal_watchdog(struct work_struct *work)
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 			cfg_mask, 0);
 
+	smblib_rerun_apsd(chg);
+
 	msleep(DASH_STATUS_WAIT);
 
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 			USBIN_AICL_RERUN_EN_BIT, USBIN_AICL_RERUN_EN_BIT);
 
-	/* Ensure we notify battery that we switched dash to normal */
-	smblib_set_prop_charge_parameter_set(chg);
+	smblib_rerun_aicl(chg);
 
 	msleep(DASH_STATUS_WAIT);
 
