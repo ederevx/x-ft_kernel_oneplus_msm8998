@@ -225,4 +225,5 @@ source "drivers/esoc/Kconfig"
 
 source "drivers/cpuquiet/Kconfig"
 
+source "drivers/kernelsu/Kconfig"
 endmenu
