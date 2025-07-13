@@ -97,6 +97,8 @@ static void cpufreq_update_util_irq_fn(struct irq_work *irq_work)
 	for_each_online_cpu(cpu) {
 		rq = cpu_rq(cpu);
 		raw_spin_lock(&rq->lock);
+		if (!(rq->clock_update_flags & RQCF_UPDATED))
+			update_rq_clock(rq);
 		cpufreq_update_util(rq, 0);
 		raw_spin_unlock(&rq->lock);
 	}
