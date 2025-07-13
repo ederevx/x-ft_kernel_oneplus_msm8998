@@ -5318,18 +5318,6 @@ static void dash_to_normal_watchdog(struct work_struct *work)
 
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 			cfg_mask, cfg_mask);
-
-	status = get_charging_status();
-	if (status == POWER_SUPPLY_STATUS_DISCHARGING)
-		return;
-
-	if (status == POWER_SUPPLY_STATUS_NOT_CHARGING) {
-		pr_warn("still not charging, fully switch to normal");
-		set_dash_charger_present(false);
-		return;
-	}
-
-	pr_info("charging, dash will continue to be present");
 }
 DECLARE_WORK(dash_to_normal_watchdog_work, dash_to_normal_watchdog);
 
