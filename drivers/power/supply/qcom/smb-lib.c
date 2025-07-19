@@ -5276,12 +5276,8 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 	op_battery_temp_region_set(chg, BATT_TEMP_INVALID);
 }
 
-/* Wait for 5 seconds */
-#define DASH_STATUS_WAIT (5 * 1000)
-
-static void dash_to_normal_watchdog(struct work_struct *work)
+static void dash_to_normal_watchdog(struct smb_charger *chg)
 {
-	struct smb_charger *chg = g_chg;
 	int status;
 	u8 cfg_mask;
 
@@ -5291,10 +5287,8 @@ static void dash_to_normal_watchdog(struct work_struct *work)
 		return;
 
 	chg->dash_on = get_prop_fast_chg_started(chg);
-	if (chg->dash_on) {
-		pr_info("dash is online, abort dash_to_normal_watchdog");
+	if (chg->dash_on)
 		return;
-	}
 
 	pr_warn("not charging, performing smblib corrections");
 
@@ -5307,19 +5301,14 @@ static void dash_to_normal_watchdog(struct work_struct *work)
 
 	smblib_rerun_apsd(chg);
 
-	msleep(DASH_STATUS_WAIT);
-
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 			USBIN_AICL_RERUN_EN_BIT, USBIN_AICL_RERUN_EN_BIT);
 
 	smblib_rerun_aicl(chg);
 
-	msleep(DASH_STATUS_WAIT);
-
 	smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 			cfg_mask, cfg_mask);
 }
-DECLARE_WORK(dash_to_normal_watchdog_work, dash_to_normal_watchdog);
 
 int update_dash_unplug_status(void)
 {
@@ -5335,7 +5324,7 @@ int update_dash_unplug_status(void)
 		power_supply_changed(g_chg->usb_psy);
 	}
 
-	schedule_work(&dash_to_normal_watchdog_work);
+	dash_to_normal_watchdog(g_chg);
 
 	return 0;
 }
