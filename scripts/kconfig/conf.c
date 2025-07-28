@@ -557,7 +557,7 @@ int main(int ac, char **av)
 		}
 	}
 	if (ac == optind) {
-		fprintf(stderr, _("%s: Kconfig file missing\n"), av[0]);
+		printf(_("%s: Kconfig file missing\n"), av[0]);
 		conf_usage(progname);
 		exit(1);
 	}
@@ -582,11 +582,9 @@ int main(int ac, char **av)
 		if (!defconfig_file)
 			defconfig_file = conf_get_default_confname();
 		if (conf_read(defconfig_file)) {
-			fprintf(stderr,
-				_("***\n"
-				  "*** Can't find default configuration \"%s\"!\n"
-				  "***\n"),
-				defconfig_file);
+			printf(_("***\n"
+				"*** Can't find default configuration \"%s\"!\n"
+				"***\n"), defconfig_file);
 			exit(1);
 		}
 		break;
