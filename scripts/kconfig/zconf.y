@@ -20,10 +20,10 @@
 
 int cdebug = PRINTD;
 
-int yylex(void);
-static void yyerror(const char *err);
+extern int zconflex(void);
 static void zconfprint(const char *err, ...);
 static void zconf_error(const char *err, ...);
+static void zconferror(const char *err);
 static bool zconf_endtoken(const struct kconf_id *id, int starttoken, int endtoken);
 
 struct symbol *symbol_hash[SYMBOL_HASHSIZE];
@@ -41,7 +41,6 @@ static struct menu *current_menu, *current_entry;
 	struct expr *expr;
 	struct menu *menu;
 	const struct kconf_id *id;
-	enum variable_flavor flavor;
 }
 
 %token <id>T_MAINMENU
@@ -78,9 +77,6 @@ static struct menu *current_menu, *current_entry;
 %token T_CLOSE_PAREN
 %token T_OPEN_PAREN
 %token T_EOL
-%token <string> T_VARIABLE
-%token <flavor> T_ASSIGN
-%token <string> T_ASSIGN_VAL
 
 %left T_OR
 %left T_AND
@@ -95,7 +91,7 @@ static struct menu *current_menu, *current_entry;
 %type <id> end
 %type <id> option_name
 %type <menu> if_entry menu_entry choice_entry
-%type <string> symbol_option_arg word_opt assign_val
+%type <string> symbol_option_arg word_opt
 
 %destructor {
 	fprintf(stderr, "%s:%d: missing end statement for this entry\n",
@@ -159,7 +155,6 @@ common_stmt:
 	| config_stmt
 	| menuconfig_stmt
 	| source_stmt
-	| assignment_stmt
 ;
 
 option_error:
@@ -516,15 +511,6 @@ symbol:	  T_WORD	{ $$ = sym_lookup($1, 0); free($1); }
 word_opt: /* empty */			{ $$ = NULL; }
 	| T_WORD
 
-/* assignment statement */
-
-assignment_stmt:  T_VARIABLE T_ASSIGN assign_val T_EOL	{ variable_add($1, $3, $2); free($1); free($3); }
-
-assign_val:
-	/* empty */		{ $$ = xstrdup(""); };
-	| T_ASSIGN_VAL
-;
-
 %%
 
 void conf_parse(const char *name)
@@ -535,16 +521,13 @@ void conf_parse(const char *name)
 
 	zconf_initscan(name);
 
+	sym_init();
 	_menu_init();
 
 	if (getenv("ZCONF_DEBUG"))
-		yydebug = 1;
-	yyparse();
-
-	/* Variables are expanded in the parse phase. We can free them here. */
-	variable_all_del();
-
-	if (yynerrs)
+		zconfdebug = 1;
+	zconfparse();
+	if (zconfnerrs)
 		exit(1);
 	if (!modules_sym)
 		modules_sym = sym_find( "n" );
@@ -557,9 +540,9 @@ void conf_parse(const char *name)
 	menu_finalize(&rootmenu);
 	for_all_symbols(i, sym) {
 		if (sym_check_deps(sym))
-			yynerrs++;
+			zconfnerrs++;
 	}
-	if (yynerrs)
+	if (zconfnerrs)
 		exit(1);
 	sym_set_change_count(1);
 }
@@ -584,7 +567,7 @@ static bool zconf_endtoken(const struct kconf_id *id, int starttoken, int endtok
 	if (id->token != endtoken) {
 		zconf_error("unexpected '%s' within %s block",
 			id->name, zconf_tokenname(starttoken));
-		yynerrs++;
+		zconfnerrs++;
 		return false;
 	}
 	if (current_menu->file != current_file) {
@@ -593,7 +576,7 @@ static bool zconf_endtoken(const struct kconf_id *id, int starttoken, int endtok
 		fprintf(stderr, "%s:%d: location of the '%s'\n",
 			current_menu->file->name, current_menu->lineno,
 			zconf_tokenname(starttoken));
-		yynerrs++;
+		zconfnerrs++;
 		return false;
 	}
 	return true;
@@ -614,7 +597,7 @@ static void zconf_error(const char *err, ...)
 {
 	va_list ap;
 
-	yynerrs++;
+	zconfnerrs++;
 	fprintf(stderr, "%s:%d: ", zconf_curname(), zconf_lineno());
 	va_start(ap, err);
 	vfprintf(stderr, err, ap);
@@ -622,7 +605,7 @@ static void zconf_error(const char *err, ...)
 	fprintf(stderr, "\n");
 }
 
-static void yyerror(const char *err)
+static void zconferror(const char *err)
 {
 	fprintf(stderr, "%s:%d: %s\n", zconf_curname(), zconf_lineno() + 1, err);
 }
@@ -784,4 +767,3 @@ void zconfdump(FILE *out)
 #include "expr.c"
 #include "symbol.c"
 #include "menu.c"
-#include "preprocess.c"

@@ -58,6 +58,7 @@ enum conf_def_mode {
 
 #define T_OPT_MODULES		1
 #define T_OPT_DEFCONFIG_LIST	2
+#define T_OPT_ENV		3
 #define T_OPT_ALLNOCONFIG_Y	4
 
 struct kconf_id {
@@ -67,7 +68,6 @@ struct kconf_id {
 	enum symbol_type stype;
 };
 
-extern int yylineno;
 void zconfdump(FILE *out);
 void zconf_starthelp(void);
 FILE *zconf_fopen(const char *name);
@@ -115,9 +115,6 @@ struct file *file_lookup(const char *name);
 int file_write_dep(const char *name);
 void *xmalloc(size_t size);
 void *xcalloc(size_t nmemb, size_t size);
-void *xrealloc(void *p, size_t size);
-char *xstrdup(const char *s);
-char *xstrndup(const char *s, size_t n);
 
 struct gstr {
 	size_t len;
@@ -135,6 +132,9 @@ void str_printf(struct gstr *gs, const char *fmt, ...);
 const char *str_get(struct gstr *gs);
 
 /* symbol.c */
+extern struct expr *sym_env_list;
+
+void sym_init(void);
 void sym_clear_all_valid(void);
 struct symbol *sym_choice_default(struct symbol *sym);
 const char *sym_get_string_default(struct symbol *sym);
