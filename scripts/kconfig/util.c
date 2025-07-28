@@ -34,6 +34,8 @@ struct file *file_lookup(const char *name)
 /* write a dependency file as used by kbuild to track dependencies */
 int file_write_dep(const char *name)
 {
+	struct symbol *sym, *env_sym;
+	struct expr *e;
 	struct file *file;
 	FILE *out;
 
@@ -52,7 +54,21 @@ int file_write_dep(const char *name)
 	fprintf(out, "\n%s: \\\n"
 		     "\t$(deps_config)\n\n", conf_get_autoconfig_name());
 
-	env_write_dep(out, conf_get_autoconfig_name());
+	expr_list_for_each_sym(sym_env_list, e, sym) {
+		struct property *prop;
+		const char *value;
+
+		prop = sym_get_env_prop(sym);
+		env_sym = prop_get_symbol(prop);
+		if (!env_sym)
+			continue;
+		value = getenv(env_sym->name);
+		if (!value)
+			value = "";
+		fprintf(out, "ifneq \"$(%s)\" \"%s\"\n", env_sym->name, value);
+		fprintf(out, "%s: FORCE\n", conf_get_autoconfig_name());
+		fprintf(out, "endif\n");
+	}
 
 	fprintf(out, "\n$(deps_config): ;\n");
 	fclose(out);
@@ -88,7 +104,7 @@ void str_append(struct gstr *gs, const char *s)
 	if (s) {
 		l = strlen(gs->s) + strlen(s) + 1;
 		if (l > gs->len) {
-			gs->s = xrealloc(gs->s, l);
+			gs->s   = realloc(gs->s, l);
 			gs->len = l;
 		}
 		strcat(gs->s, s);
@@ -124,37 +140,6 @@ void *xmalloc(size_t size)
 void *xcalloc(size_t nmemb, size_t size)
 {
 	void *p = calloc(nmemb, size);
-	if (p)
-		return p;
-	fprintf(stderr, "Out of memory.\n");
-	exit(1);
-}
-
-void *xrealloc(void *p, size_t size)
-{
-	p = realloc(p, size);
-	if (p)
-		return p;
-	fprintf(stderr, "Out of memory.\n");
-	exit(1);
-}
-
-char *xstrdup(const char *s)
-{
-	char *p;
-
-	p = strdup(s);
-	if (p)
-		return p;
-	fprintf(stderr, "Out of memory.\n");
-	exit(1);
-}
-
-char *xstrndup(const char *s, size_t n)
-{
-	char *p;
-
-	p = strndup(s, n);
 	if (p)
 		return p;
 	fprintf(stderr, "Out of memory.\n");
