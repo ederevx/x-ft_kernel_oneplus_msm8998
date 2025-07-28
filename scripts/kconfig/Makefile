@@ -191,7 +191,6 @@ gconf-objs	:= gconf.o zconf.tab.o
 
 hostprogs-y := conf nconf mconf kxgettext qconf gconf
 
-targets		+= zconf.tab.c zconf.lex.c
 clean-files	:= qconf.moc .tmp_qtcheck .tmp_gtkcheck
 clean-files	+= zconf.tab.c zconf.lex.c gconf.glade.h
 clean-files     += config.pot linux.pot
@@ -210,6 +209,9 @@ HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC)
 # generated files seem to need this to find local include files
 HOSTCFLAGS_zconf.lex.o	:= -I$(src)
 HOSTCFLAGS_zconf.tab.o	:= -I$(src)
+
+LEX_PREFIX_zconf	:= zconf
+YACC_PREFIX_zconf	:= zconf
 
 HOSTLOADLIBES_qconf	= $(KC_QT_LIBS)
 HOSTCXXFLAGS_qconf.o	= $(KC_QT_CFLAGS)
