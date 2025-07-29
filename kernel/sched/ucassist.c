@@ -17,11 +17,14 @@ int cpu_uclamp_write_css(struct cgroup_subsys_state *css, char *buf,
 					enum uclamp_id clamp_id);
 int cpu_uclamp_ls_write_u64(struct cgroup_subsys_state *css,
 				   struct cftype *cftype, u64 ls);
+int cpu_uclamp_boosted_write_u64(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, u64 ls);
 
 struct uclamp_data {
 	char uclamp_max[3];
 	char uclamp_min[3];
 	bool latency_sensitive;
+	bool boosted;
 };
 
 struct ucassist_struct {
@@ -33,31 +36,31 @@ struct ucassist_struct {
 static struct ucassist_struct ucassist_data[] = {
 	{
 		.name = "top-app",
-		.data = { "max", "1", 1 },
+		.data = { "max", "1", 1, 1 },
 	},
 	{
 		.name = "foreground",
-		.data = { "max", "0", 1 },
+		.data = { "max", "0", 1, 1 },
 	},
 	{
 		.name = "background",
-		.data = { "50", "0", 0 },
+		.data = { "50", "0", 0, 0 },
 	},
 	{
 		.name = "system-background",
-		.data = { "50", "0", 0 },
+		.data = { "50", "0", 0, 0 },
 	},
 	{
 		.name = "dex2oat",
-		.data = { "60", "0", 0 },
+		.data = { "60", "0", 0, 0 },
 	},
 	{
 		.name = "nnapi-hal",
-		.data = { "max", "50", 0 },
+		.data = { "max", "50", 0, 0 },
 	},
 	{
 		.name = "camera-daemon",
-		.data = { "max", "1", 1 },
+		.data = { "max", "1", 1, 0 },
 	},
 };
 
@@ -71,6 +74,8 @@ static void ucassist_set_uclamp_data(struct cgroup_subsys_state *css,
 				UCLAMP_MIN);
 	
 	cpu_uclamp_ls_write_u64(css, NULL, cdata.latency_sensitive);
+
+	cpu_uclamp_boosted_write_u64(css, NULL, cdata.boosted);
 }
 
 int cpu_ucassist_init_values(struct cgroup_subsys_state *css)
