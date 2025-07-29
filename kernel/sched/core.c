@@ -6,6 +6,7 @@
  *  Copyright (C) 1991-2002  Linus Torvalds
  */
 #include <linux/sched.h>
+#include <linux/sched-ucassist.h>
 #include <linux/sched/clock.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/sched/loadavg.h>
@@ -1283,6 +1284,11 @@ int sysctl_sched_uclamp_handler(struct ctl_table *table, int write,
 		goto undo;
 	}
 
+	if (ucassist_restrict_enabled) {
+		sysctl_sched_uclamp_util_min = old_min;
+		sysctl_sched_uclamp_util_max = old_max;
+	}
+
 	if (old_min != sysctl_sched_uclamp_util_min) {
 		uclamp_se_set(&uclamp_default[UCLAMP_MIN],
 			      sysctl_sched_uclamp_util_min, false);
@@ -1322,6 +1328,39 @@ done:
 	return result;
 }
 
+void ucassist_sched_uclamp_set(unsigned int min, unsigned int max)
+{
+	if (min > max || max > SCHED_CAPACITY_SCALE) {
+		pr_err("%s: Invalid values: %d, %d", __func__, min, max);
+		return;
+	}
+
+	mutex_lock(&uclamp_mutex);
+
+	if (sysctl_sched_uclamp_util_min == min &&
+	    sysctl_sched_uclamp_util_max == max)
+		goto end;
+
+	/* Override sysctl values and configure */
+	if (sysctl_sched_uclamp_util_min != min) {
+		sysctl_sched_uclamp_util_min = min;
+		uclamp_se_set(&uclamp_default[UCLAMP_MIN],
+				sysctl_sched_uclamp_util_min, false);
+	}
+
+	if (sysctl_sched_uclamp_util_max != max) {
+		sysctl_sched_uclamp_util_max = max;
+		uclamp_se_set(&uclamp_default[UCLAMP_MAX],
+				sysctl_sched_uclamp_util_max, false);
+	}
+
+	static_branch_enable(&sched_uclamp_used);
+	uclamp_update_root_tg();
+
+end:
+	mutex_unlock(&uclamp_mutex);
+}
+
 static int uclamp_validate(struct task_struct *p,
 			   const struct sched_attr *attr)
 {
@@ -1332,6 +1371,8 @@ static int uclamp_validate(struct task_struct *p,
 		lower_bound = attr->sched_util_min;
 	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX)
 		upper_bound = attr->sched_util_max;
+
+	ucassist_get_task_uclamp_data(p, &lower_bound, &upper_bound, 0);
 
 	if (lower_bound > upper_bound)
 		return -EINVAL;
@@ -1349,6 +1390,69 @@ static int uclamp_validate(struct task_struct *p,
 
 	return 0;
 }
+
+static inline bool task_has_ucassist_done(struct task_struct *p)
+{
+	if (task_ucassist_done(p))
+		return true;
+
+	task_set_ucassist_done(p);
+	return false;
+}
+
+static inline void uclamp_ucassist_set(struct task_struct *p,
+				unsigned int min, unsigned int max)
+{
+	pr_info("%s: setting values for %s: %d, %d", __func__, 
+			p->comm, min, max);
+
+	uclamp_se_set(&p->uclamp_req[UCLAMP_MIN], min, true);
+	uclamp_se_set(&p->uclamp_req[UCLAMP_MAX], max, true);
+}
+
+static int __setscheduler_ucassist(struct task_struct *p)
+{
+	unsigned int min, max;
+	int ret;
+
+	ret = __ucassist_get_task_uclamp_data(p->comm, &min, &max, 0);
+	if (ret)
+		return ret;
+
+	if (likely(task_has_ucassist_done(p)))
+		return -EALREADY;
+
+	uclamp_ucassist_set(p, min, max);
+	return 0;
+}
+
+int setscheduler_task_ucassist(struct task_struct *p, 
+				unsigned int flags)
+{
+	struct rq_flags rf;
+	struct rq *rq;
+	enum uclamp_id clamp_id;
+	unsigned int min, max;
+	int ret;
+
+	ret = ucassist_get_task_uclamp_data(p, &min, &max, flags);
+	if (ret)
+		return ret;
+
+	if (likely(task_has_ucassist_done(p)))
+		return -EALREADY;
+
+	rq = task_rq_lock(p, &rf);
+
+	uclamp_ucassist_set(p, min, max);
+	/* Have changes take effect immediately for the task */
+	for_each_clamp_id(clamp_id)
+		uclamp_rq_reinc_id(rq, p, clamp_id);
+
+	task_rq_unlock(rq, p, &rf);
+	return 0;
+}
+EXPORT_SYMBOL(setscheduler_task_ucassist);
 
 static void __setscheduler_uclamp(struct task_struct *p,
 				  const struct sched_attr *attr)
@@ -1377,6 +1481,10 @@ static void __setscheduler_uclamp(struct task_struct *p,
 
 	}
 
+	/* If the task is defined in UCASSIST, override userspace values */
+	if (__ucassist_task_is_target(p->comm, 0))
+		return;
+
 	if (likely(!(attr->sched_flags & SCHED_FLAG_UTIL_CLAMP)))
 		return;
 
@@ -1404,6 +1512,8 @@ static void uclamp_fork(struct task_struct *p)
 
 	if (likely(!p->sched_reset_on_fork))
 		return;
+
+	task_clear_ucassist_done(p);
 
 	for_each_clamp_id(clamp_id) {
 		uclamp_se_set(&p->uclamp_req[clamp_id],
@@ -5329,7 +5439,8 @@ recheck:
 	}
 
 	/* Update task specific "requested" clamps */
-	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP) {
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP || 
+	    ucassist_task_is_target(p, 0)) {
 		retval = uclamp_validate(p, attr);
 		if (retval)
 			return retval;
@@ -5352,6 +5463,10 @@ recheck:
 		task_rq_unlock(rq, p, &rf);
 		return -EINVAL;
 	}
+
+	/* Enforce UCASSIST values regardless of policy change */
+	if (!__setscheduler_ucassist(p))
+		goto change;
 
 	/*
 	 * If not changing anything there's no need to proceed further,
@@ -8101,10 +8216,6 @@ cpu_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 	return &tg->css;
 }
 
-#ifdef CONFIG_UCLAMP_TASK_GROUP
-int cpu_ucassist_init_values(struct cgroup_subsys_state *css);
-#endif
-
 /* Expose task group only after completing cgroup initialization */
 static int cpu_cgroup_css_online(struct cgroup_subsys_state *css)
 {
@@ -8122,7 +8233,7 @@ static int cpu_cgroup_css_online(struct cgroup_subsys_state *css)
 	rcu_read_unlock();
 	mutex_unlock(&uclamp_mutex);
 
-	cpu_ucassist_init_values(css);
+	ucassist_init_cpu_values(css);
 #endif
 
 	return 0;
@@ -8328,11 +8439,20 @@ int cpu_uclamp_write_css(struct cgroup_subsys_state *css, char *buf,
 	return 0;
 }
 
+static int cpu_uclamp_write_css_user(struct cgroup_subsys_state *css, char *buf,
+					enum uclamp_id clamp_id)
+{
+	if (ucassist_restrict_enabled)
+		return 0;
+
+	return cpu_uclamp_write_css(css, buf, clamp_id);
+}
+
 static ssize_t cpu_uclamp_write(struct kernfs_open_file *of, char *buf,
 				size_t nbytes, loff_t off,
 				enum uclamp_id clamp_id)
 {
-	return cpu_uclamp_write_css(of_css(of), buf, clamp_id) ?: nbytes;
+	return cpu_uclamp_write_css_user(of_css(of), buf, clamp_id) ?: nbytes;
 }
 
 static ssize_t cpu_uclamp_min_write(struct kernfs_open_file *of,
@@ -8395,6 +8515,15 @@ int cpu_uclamp_ls_write_u64(struct cgroup_subsys_state *css,
 	tg->latency_sensitive = (unsigned int) ls;
 
 	return 0;
+}
+
+static int cpu_uclamp_ls_write_u64_user(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, u64 ls)
+{
+	if (ucassist_restrict_enabled)
+		return 0;
+
+	return cpu_uclamp_ls_write_u64(css, cftype, ls);
 }
 
 static u64 cpu_uclamp_ls_read_u64(struct cgroup_subsys_state *css,
@@ -8753,7 +8882,7 @@ static struct cftype cpu_files[] = {
 		.name = "uclamp.latency_sensitive",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.read_u64 = cpu_uclamp_ls_read_u64,
-		.write_u64 = cpu_uclamp_ls_write_u64,
+		.write_u64 = cpu_uclamp_ls_write_u64_user,
 	},
 #endif
 	{ }	/* Terminate */
