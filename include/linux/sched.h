@@ -1680,6 +1680,7 @@ static __always_inline bool is_percpu_thread(void)
 #define PFA_SPEC_IB_DISABLE		5	/* Indirect branch speculation restricted */
 #define PFA_SPEC_IB_FORCE_DISABLE	6	/* Indirect branch speculation permanently restricted */
 #define PFA_LMK_WAITING			7	/* Lowmemorykiller is waiting */
+#define PFA_UCASSIST_DONE		8	/* Task has been evaluated by UCASSIST */
 
 #define TASK_PFA_TEST(name, func)					\
 	static inline bool task_##func(struct task_struct *p)		\
@@ -1720,6 +1721,10 @@ TASK_PFA_SET(SPEC_IB_FORCE_DISABLE, spec_ib_force_disable)
 
 TASK_PFA_TEST(LMK_WAITING, lmk_waiting)
 TASK_PFA_SET(LMK_WAITING, lmk_waiting)
+
+TASK_PFA_TEST(UCASSIST_DONE, ucassist_done)
+TASK_PFA_SET(UCASSIST_DONE, ucassist_done)
+TASK_PFA_CLEAR(UCASSIST_DONE, ucassist_done)
 
 static inline void
 current_restore_flags(unsigned long orig_flags, unsigned long flags)
