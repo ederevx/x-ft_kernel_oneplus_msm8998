@@ -1350,6 +1350,25 @@ static int uclamp_validate(struct task_struct *p,
 	return 0;
 }
 
+int task_ucassist_get_uclamp_data(struct task_struct *p, 
+				unsigned int *min, unsigned int *max);
+
+static void __setscheduler_ucassist(struct task_struct *p)
+{
+	unsigned int prev_min, prev_max, min, max;
+
+	prev_min = min = p->uclamp_req[UCLAMP_MIN].value;
+	prev_max = max = p->uclamp_req[UCLAMP_MAX].value;
+
+	if (task_ucassist_get_uclamp_data(p, &min, &max))
+		return;
+
+	if (prev_min != min)
+		uclamp_se_set(&p->uclamp_req[UCLAMP_MIN], min, true);
+	if (prev_max != max)
+		uclamp_se_set(&p->uclamp_req[UCLAMP_MAX], max, true);
+}
+
 static void __setscheduler_uclamp(struct task_struct *p,
 				  const struct sched_attr *attr)
 {
@@ -1376,6 +1395,8 @@ static void __setscheduler_uclamp(struct task_struct *p,
 			uclamp_se_set(uc_se, uclamp_none(clamp_id), false);
 
 	}
+
+	__setscheduler_ucassist(p);
 
 	if (likely(!(attr->sched_flags & SCHED_FLAG_UTIL_CLAMP)))
 		return;
