@@ -52,11 +52,11 @@ struct ucassist_task_struct {
 static const struct ucassist_css_struct ucassist_css_data[] = {
 	{
 		.name = "top-app",
-		.data = { "max", "1", 1, 1 },
+		.data = { "max", "10", 1, 1 },
 	},
 	{
 		.name = "foreground",
-		.data = { "max", "0", 1, 1 },
+		.data = { "max", "0", 0, 0 },
 	},
 	{
 		.name = "background",
@@ -76,7 +76,7 @@ static const struct ucassist_css_struct ucassist_css_data[] = {
 	},
 	{
 		.name = "camera-daemon",
-		.data = { "max", "1", 1, 0 },
+		.data = { "max", "10", 1, 0 },
 	},
 };
 
