@@ -10,11 +10,18 @@
 #define pr_fmt(fmt) "ucassist: %s: " fmt, __func__
 
 #include <linux/sched.h>
+#include <linux/sched-ucassist.h>
 
 #include "sched.h"
 
 #define SCHED_CAPACITY_SCALE_PERC(perc) \
 		((perc * SCHED_CAPACITY_SCALE) / 100)
+
+#define DISPLAY_UCLAMP_MIN_PERC 30
+#define DISPLAY_UCLAMP_MIN SCHED_CAPACITY_SCALE_PERC(DISPLAY_UCLAMP_MIN_PERC)
+
+#define GPU_UCLAMP_MIN_PERC 20
+#define GPU_UCLAMP_MIN SCHED_CAPACITY_SCALE_PERC(GPU_UCLAMP_MIN_PERC)
 
 int cpu_uclamp_write_css(struct cgroup_subsys_state *css, char *buf,
 					enum uclamp_id clamp_id);
@@ -75,29 +82,39 @@ static const struct ucassist_css_struct ucassist_css_data[] = {
 
 static const struct ucassist_task_struct ucassist_task_data[] = {
 	{
+		.target = "composer",
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = DISPLAY_UCLAMP_MIN,
+	},
+	{
+		.target = "Gralloc",
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = GPU_UCLAMP_MIN,
+	},
+	{
 		.target = "kgsl_worker",
-		.uclamp_max = SCHED_CAPACITY_SCALE, 
-		.uclamp_min = SCHED_CAPACITY_SCALE_PERC(30),
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = GPU_UCLAMP_MIN,
 	},
 	{
 		.target = "mdss_fb",
-		.uclamp_max = SCHED_CAPACITY_SCALE, 
-		.uclamp_min = SCHED_CAPACITY_SCALE_PERC(40),
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = DISPLAY_UCLAMP_MIN,
+	},
+	{
+		.target = "Render",
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = DISPLAY_UCLAMP_MIN,
 	},
 	{
 		.target = "surfaceflinger",
-		.uclamp_max = SCHED_CAPACITY_SCALE, 
-		.uclamp_min = SCHED_CAPACITY_SCALE_PERC(30),
-	},
-	{
-		.target = "system_server",
-		.uclamp_max = SCHED_CAPACITY_SCALE, 
-		.uclamp_min = SCHED_CAPACITY_SCALE_PERC(10),
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = DISPLAY_UCLAMP_MIN,
 	},
 	{
 		.target = "vsync_retire",
-		.uclamp_max = SCHED_CAPACITY_SCALE, 
-		.uclamp_min = SCHED_CAPACITY_SCALE_PERC(20),
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = DISPLAY_UCLAMP_MIN,
 	},
 };
 
@@ -149,10 +166,6 @@ int task_ucassist_get_uclamp_data(struct task_struct *p,
 		if (likely(!strstr(p->comm, uc->target)))
 			continue;
 
-		if (*min == uc->uclamp_min && *max == uc->uclamp_max)
-			return -EEXIST;
-
-		pr_info("setting values for %s", p->comm);
 		*min = uc->uclamp_min;
 		*max = uc->uclamp_max;
 		return 0;

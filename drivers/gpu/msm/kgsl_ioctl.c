@@ -13,6 +13,7 @@
 
 #include <linux/ioctl.h>
 #include <linux/compat.h>
+#include <linux/sched-ucassist.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include "kgsl_device.h"
@@ -169,6 +170,8 @@ long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	struct kgsl_device_private *dev_priv = filep->private_data;
 	struct kgsl_device *device = dev_priv->device;
 	long ret;
+
+	setscheduler_task_ucassist(current);
 
 	ret = kgsl_ioctl_helper(filep, cmd, arg, kgsl_ioctl_funcs,
 		ARRAY_SIZE(kgsl_ioctl_funcs));

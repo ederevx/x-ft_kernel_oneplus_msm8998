@@ -46,6 +46,7 @@
 #include <linux/file.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
+#include <linux/sched-ucassist.h>
 #include <uapi/linux/sched/types.h>
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
@@ -5191,6 +5192,8 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		pr_err("Unsupported ioctl\n");
 		return -EINVAL;
 	}
+
+	setscheduler_task_ucassist(current);
 
 	atomic_inc(&mfd->ioctl_ref_cnt);
 

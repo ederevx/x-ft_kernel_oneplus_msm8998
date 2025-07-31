@@ -6,6 +6,7 @@
  *  Copyright (C) 1991-2002  Linus Torvalds
  */
 #include <linux/sched.h>
+#include <linux/sched-ucassist.h>
 #include <linux/sched/clock.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/sched/loadavg.h>
@@ -1350,24 +1351,36 @@ static int uclamp_validate(struct task_struct *p,
 	return 0;
 }
 
-int task_ucassist_get_uclamp_data(struct task_struct *p, 
-				unsigned int *min, unsigned int *max);
-
 static void __setscheduler_ucassist(struct task_struct *p)
 {
 	unsigned int prev_min, prev_max, min, max;
 
-	prev_min = min = p->uclamp_req[UCLAMP_MIN].value;
-	prev_max = max = p->uclamp_req[UCLAMP_MAX].value;
-
 	if (task_ucassist_get_uclamp_data(p, &min, &max))
 		return;
+
+	prev_min = p->uclamp_req[UCLAMP_MIN].value;
+	prev_max = p->uclamp_req[UCLAMP_MAX].value;
+
+	if (prev_min != min || prev_max != max)
+		pr_info("%s: setting values for %s: %d, %d", __func__, 
+				p->comm, min, max);
 
 	if (prev_min != min)
 		uclamp_se_set(&p->uclamp_req[UCLAMP_MIN], min, true);
 	if (prev_max != max)
 		uclamp_se_set(&p->uclamp_req[UCLAMP_MAX], max, true);
 }
+
+void setscheduler_task_ucassist(struct task_struct *p)
+{
+	struct rq_flags rf;
+	struct rq *rq;
+
+	rq = task_rq_lock(p, &rf);
+	__setscheduler_ucassist(p);
+	task_rq_unlock(rq, p, &rf);
+}
+EXPORT_SYMBOL(setscheduler_task_ucassist);
 
 static void __setscheduler_uclamp(struct task_struct *p,
 				  const struct sched_attr *attr)
@@ -8121,10 +8134,6 @@ cpu_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 
 	return &tg->css;
 }
-
-#ifdef CONFIG_UCLAMP_TASK_GROUP
-int cpu_ucassist_init_values(struct cgroup_subsys_state *css);
-#endif
 
 /* Expose task group only after completing cgroup initialization */
 static int cpu_cgroup_css_online(struct cgroup_subsys_state *css)
