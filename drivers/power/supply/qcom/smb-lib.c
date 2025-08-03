@@ -5276,21 +5276,11 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 	op_battery_temp_region_set(chg, BATT_TEMP_INVALID);
 }
 
-static void dash_to_normal_watchdog(struct smb_charger *chg)
+static void dash_to_normal_workaround(struct smb_charger *chg)
 {
-	int status;
 	u8 cfg_mask;
 
-	status = get_charging_status();
-	if (status == POWER_SUPPLY_STATUS_CHARGING ||
-		status == POWER_SUPPLY_STATUS_DISCHARGING)
-		return;
-
-	chg->dash_on = get_prop_fast_chg_started(chg);
-	if (chg->dash_on)
-		return;
-
-	pr_warn("not charging, performing smblib corrections");
+	pr_info("applying dash to normal workaround");
 
 	/* Reset USBIN collapse and rerun AICL */
 	cfg_mask = SUSPEND_ON_COLLAPSE_USBIN_BIT
@@ -5324,7 +5314,7 @@ int update_dash_unplug_status(void)
 		power_supply_changed(g_chg->usb_psy);
 	}
 
-	dash_to_normal_watchdog(g_chg);
+	dash_to_normal_workaround(g_chg);
 
 	return 0;
 }
