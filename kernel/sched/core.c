@@ -1284,6 +1284,11 @@ int sysctl_sched_uclamp_handler(struct ctl_table *table, int write,
 		goto undo;
 	}
 
+	if (ucassist_restrict_enabled) {
+		sysctl_sched_uclamp_util_min = old_min;
+		sysctl_sched_uclamp_util_max = old_max;
+	}
+
 	if (old_min != sysctl_sched_uclamp_util_min) {
 		uclamp_se_set(&uclamp_default[UCLAMP_MIN],
 			      sysctl_sched_uclamp_util_min, false);
@@ -1323,6 +1328,34 @@ done:
 	return result;
 }
 
+void ucassist_sched_uclamp_set(unsigned int min, unsigned int max)
+{
+	if (min > max || max > SCHED_CAPACITY_SCALE) {
+		pr_err("%s: Invalid values: %d, %d", __func__, min, max);
+		return;
+	}
+
+	if (sysctl_sched_uclamp_util_min == min &&
+	    sysctl_sched_uclamp_util_max == max)
+		return;
+
+	/* Override sysctl values and configure */
+	if (sysctl_sched_uclamp_util_min != min) {
+		sysctl_sched_uclamp_util_min = min;
+		uclamp_se_set(&uclamp_default[UCLAMP_MIN],
+				sysctl_sched_uclamp_util_min, false);
+	}
+
+	if (sysctl_sched_uclamp_util_max != max) {
+		sysctl_sched_uclamp_util_max = max;
+		uclamp_se_set(&uclamp_default[UCLAMP_MAX],
+				sysctl_sched_uclamp_util_max, false);
+	}
+
+	static_branch_enable(&sched_uclamp_used);
+	uclamp_update_root_tg();
+}
+
 static int uclamp_validate(struct task_struct *p,
 			   const struct sched_attr *attr)
 {
@@ -1333,6 +1366,8 @@ static int uclamp_validate(struct task_struct *p,
 		lower_bound = attr->sched_util_min;
 	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX)
 		upper_bound = attr->sched_util_max;
+
+	ucassist_get_task_uclamp_data(p, &lower_bound, &upper_bound);
 
 	if (lower_bound > upper_bound)
 		return -EINVAL;
@@ -1351,12 +1386,12 @@ static int uclamp_validate(struct task_struct *p,
 	return 0;
 }
 
-static void __setscheduler_ucassist(struct task_struct *p)
+static int __setscheduler_ucassist(struct task_struct *p)
 {
 	unsigned int prev_min, prev_max, min, max;
 
-	if (task_ucassist_get_uclamp_data(p, &min, &max))
-		return;
+	if (ucassist_get_task_uclamp_data(p, &min, &max))
+		return -EINVAL;
 
 	prev_min = p->uclamp_req[UCLAMP_MIN].value;
 	prev_max = p->uclamp_req[UCLAMP_MAX].value;
@@ -1369,16 +1404,21 @@ static void __setscheduler_ucassist(struct task_struct *p)
 		uclamp_se_set(&p->uclamp_req[UCLAMP_MIN], min, true);
 	if (prev_max != max)
 		uclamp_se_set(&p->uclamp_req[UCLAMP_MAX], max, true);
+
+	return 0;
 }
 
-void setscheduler_task_ucassist(struct task_struct *p)
+int setscheduler_task_ucassist(struct task_struct *p)
 {
 	struct rq_flags rf;
 	struct rq *rq;
+	int ret;
 
 	rq = task_rq_lock(p, &rf);
-	__setscheduler_ucassist(p);
+	ret = __setscheduler_ucassist(p);
 	task_rq_unlock(rq, p, &rf);
+
+	return ret;
 }
 EXPORT_SYMBOL(setscheduler_task_ucassist);
 
@@ -1409,7 +1449,9 @@ static void __setscheduler_uclamp(struct task_struct *p,
 
 	}
 
-	__setscheduler_ucassist(p);
+	/* If the task is defined in UCASSIST, override userspace values */
+	if (!__setscheduler_ucassist(p))
+		return;
 
 	if (likely(!(attr->sched_flags & SCHED_FLAG_UTIL_CLAMP)))
 		return;
@@ -8152,7 +8194,7 @@ static int cpu_cgroup_css_online(struct cgroup_subsys_state *css)
 	rcu_read_unlock();
 	mutex_unlock(&uclamp_mutex);
 
-	cpu_ucassist_init_values(css);
+	ucassist_init_cpu_values(css);
 #endif
 
 	return 0;
