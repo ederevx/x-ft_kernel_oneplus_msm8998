@@ -8400,11 +8400,20 @@ int cpu_uclamp_write_css(struct cgroup_subsys_state *css, char *buf,
 	return 0;
 }
 
+static int cpu_uclamp_write_css_user(struct cgroup_subsys_state *css, char *buf,
+					enum uclamp_id clamp_id)
+{
+	if (ucassist_restrict_enabled)
+		return 0;
+
+	return cpu_uclamp_write_css(css, buf, clamp_id);
+}
+
 static ssize_t cpu_uclamp_write(struct kernfs_open_file *of, char *buf,
 				size_t nbytes, loff_t off,
 				enum uclamp_id clamp_id)
 {
-	return cpu_uclamp_write_css(of_css(of), buf, clamp_id) ?: nbytes;
+	return cpu_uclamp_write_css_user(of_css(of), buf, clamp_id) ?: nbytes;
 }
 
 static ssize_t cpu_uclamp_min_write(struct kernfs_open_file *of,
@@ -8469,6 +8478,15 @@ int cpu_uclamp_ls_write_u64(struct cgroup_subsys_state *css,
 	return 0;
 }
 
+static int cpu_uclamp_ls_write_u64_user(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, u64 ls)
+{
+	if (ucassist_restrict_enabled)
+		return 0;
+
+	return cpu_uclamp_ls_write_u64(css, cftype, ls);
+}
+
 static u64 cpu_uclamp_ls_read_u64(struct cgroup_subsys_state *css,
 				  struct cftype *cft)
 {
@@ -8488,6 +8506,15 @@ int cpu_uclamp_boosted_write_u64(struct cgroup_subsys_state *css,
 	tg->boosted = (unsigned int) boosted;
 
 	return 0;
+}
+
+static int cpu_uclamp_boosted_write_u64_user(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, u64 boosted)
+{
+	if (ucassist_restrict_enabled)
+		return 0;
+
+	return cpu_uclamp_boosted_write_u64(css, cftype, boosted);
 }
 
 static u64 cpu_uclamp_boosted_read_u64(struct cgroup_subsys_state *css,
@@ -8846,13 +8873,13 @@ static struct cftype cpu_files[] = {
 		.name = "uclamp.latency_sensitive",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.read_u64 = cpu_uclamp_ls_read_u64,
-		.write_u64 = cpu_uclamp_ls_write_u64,
+		.write_u64 = cpu_uclamp_ls_write_u64_user,
 	},
 	{
 		.name = "uclamp.boosted",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.read_u64 = cpu_uclamp_boosted_read_u64,
-		.write_u64 = cpu_uclamp_boosted_write_u64,
+		.write_u64 = cpu_uclamp_boosted_write_u64_user,
 	},
 #endif
 	{ }	/* Terminate */

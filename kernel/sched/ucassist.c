@@ -4,8 +4,8 @@
  *
  * Copyright (C) 2024-2025, Edrick Vince Sinsuan
  *
- * This provides the kernel a way to configure uclamp values at init
- * for taskgroups and during runtime for defined tasks.
+ * This provides the kernel a way to configure and manage uclamp values at
+ * init and during runtime for taskgroups and defined tasks.
  */
 #define pr_fmt(fmt) "ucassist: %s: " fmt, __func__
 
@@ -38,6 +38,26 @@ int cpu_uclamp_ls_write_u64(struct cgroup_subsys_state *css,
 int cpu_uclamp_boosted_write_u64(struct cgroup_subsys_state *css,
 				   struct cftype *cftype, u64 ls);
 
+enum {
+	TOP_APP_CSS = 0,
+	FG_CSS,
+	BG_CSS,
+	SYS_BG_CSS,
+	DEX2OAT_CSS,
+	NNAPI_CSS,
+	CAMERA_CSS,
+	NUM_CSS,
+};
+
+enum {
+	ACTIVE_STATE = 0,
+	INPUT_SLEEP_STATE,
+#ifdef CONFIG_FB
+	FB_SLEEP_STATE,
+#endif
+	NUM_STATES,
+};
+
 struct uclamp_data {
 	char uclamp_max[3];
 	char uclamp_min[3];
@@ -47,6 +67,7 @@ struct uclamp_data {
 
 struct ucassist_css_struct {
 	const char *name;
+	struct cgroup_subsys_state *css;
 	struct uclamp_data data;
 	bool initialized;
 };
@@ -61,51 +82,71 @@ struct ucassist_task_struct {
 struct ucassist_sleep_struct {
 	unsigned int uclamp_max;
 	unsigned int uclamp_min;
+	struct ucassist_css_struct *css_data;
+	unsigned int css_num_data;
 };
 
-enum {
-	ZERO_SLEEP_STATE = 0,
-	INPUT_SLEEP_STATE,
-#ifdef CONFIG_FB
-	FB_SLEEP_STATE,
-#endif
-	MAX_STATES,
+struct ucassist_struct {
+	struct kthread_work update_work;
+	struct kthread_worker worker;
+	struct irq_work input_work;
+	struct timer_list input_timer;
+	unsigned long sleep_states;
+	atomic_t input_pending;
 };
-
-static unsigned long ucassist_sleep_states = 0;
 
 bool ucassist_restrict_enabled __read_mostly = false;
 
 static const struct ucassist_css_struct ucassist_css_data[] = {
-	{
+	[TOP_APP_CSS] = {
 		.name = "top-app",
 		.data = { "max", "10", 1, 1 },
 	},
-	{
+	[FG_CSS] = {
 		.name = "foreground",
 		.data = { "max", "0", 0, 0 },
 	},
-	{
+	[BG_CSS] = {
 		.name = "background",
 		.data = { "50", "0", 0, 0 },
 	},
-	{
+	[SYS_BG_CSS] = {
 		.name = "system-background",
 		.data = { "50", "0", 0, 0 },
 	},
-	{
+	[DEX2OAT_CSS] = {
 		.name = "dex2oat",
 		.data = { "60", "0", 0, 0 },
 	},
-	{
+	[NNAPI_CSS] = {
 		.name = "nnapi-hal",
 		.data = { "max", "50", 0, 0 },
 	},
-	{
+	[CAMERA_CSS] = {
 		.name = "camera-daemon",
 		.data = { "max", "10", 1, 0 },
 	},
 };
+
+static struct ucassist_css_struct ucassist_active_css_data[] = {
+	[TOP_APP_CSS] = {
+		.data = { "max", "20", 1, 1 },
+	},
+};
+
+static struct ucassist_css_struct ucassist_input_sleep_css_data[] = {
+	[TOP_APP_CSS] = {
+		.data = { "max", "10", 1, 0 },
+	},
+};
+
+#ifdef CONFIG_FB
+static struct ucassist_css_struct ucassist_fb_sleep_css_data[] = {
+	[TOP_APP_CSS] = {
+		.data = { "max", "0", 0, 0 },
+	},
+};
+#endif
 
 static const struct ucassist_task_struct ucassist_task_data[] = {
 	{
@@ -142,7 +183,7 @@ static const struct ucassist_task_struct ucassist_task_data[] = {
 		.target = "surfaceflinger",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.trigger_input = true,
+		.trigger_input = false,
 	},
 	{
 		.target = "vsync_retire",
@@ -153,24 +194,35 @@ static const struct ucassist_task_struct ucassist_task_data[] = {
 };
 
 static const struct ucassist_sleep_struct ucassist_sleep_data[] = {
-	[ZERO_SLEEP_STATE] = {
+	[ACTIVE_STATE] = {
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = SCHED_CAPACITY_SCALE,
+		.css_data = ucassist_active_css_data,
+		.css_num_data = ARRAY_SIZE(ucassist_active_css_data),
 	},
 	[INPUT_SLEEP_STATE] = {
 		.uclamp_max = SCHED_CAPACITY_SCALE_PERC(75),
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
+		.css_data = ucassist_input_sleep_css_data,
+		.css_num_data = ARRAY_SIZE(ucassist_input_sleep_css_data),
 	},
 #ifdef CONFIG_FB
 	[FB_SLEEP_STATE] = {
 		.uclamp_max = SCHED_CAPACITY_SCALE_PERC(50),
 		.uclamp_min = 0,
+		.css_data = ucassist_fb_sleep_css_data,
+		.css_num_data = ARRAY_SIZE(ucassist_fb_sleep_css_data),
 	},
 #endif
 };
 
+static struct ucassist_struct ucassist = {
+	.sleep_states = 0,
+	.input_pending = ATOMIC_INIT(0),
+};
+
 static void ucassist_set_css_uclamp_data(struct cgroup_subsys_state *css,
-		struct uclamp_data cdata)
+				struct uclamp_data cdata)
 {
 	cpu_uclamp_write_css(css, cdata.uclamp_max, 
 				UCLAMP_MAX);
@@ -183,22 +235,26 @@ static void ucassist_set_css_uclamp_data(struct cgroup_subsys_state *css,
 	cpu_uclamp_boosted_write_u64(css, NULL, cdata.boosted);
 }
 
+static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css, 
+				unsigned int css_num);
+
 int ucassist_init_cpu_values(struct cgroup_subsys_state *css)
 {
 	const struct ucassist_css_struct *uc;
-	int i;
+	int css_num = TOP_APP_CSS;
 
 	if (!css->cgroup->kn)
 		return -EINVAL;
 
-	for (i = 0; i < ARRAY_SIZE(ucassist_css_data); i++) {
-		uc = &ucassist_css_data[i];
+	for (; css_num < ARRAY_SIZE(ucassist_css_data); css_num++) {
+		uc = &ucassist_css_data[css_num];
 
 		if (strcmp(css->cgroup->kn->name, uc->name))
 			continue;
 
 		pr_info("setting values for %s", uc->name);
 		ucassist_set_css_uclamp_data(css, uc->data);
+		ucassist_sleep_set_css_data(css, css_num);
 		break;
 	}
 
@@ -232,62 +288,89 @@ int ucassist_get_task_uclamp_data(struct task_struct *p,
 	return -EINVAL;
 }
 
-static void ucassist_state_update_fn(struct work_struct *work)
+static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css, 
+				unsigned int css_num)
 {
 	const struct ucassist_sleep_struct *us;
 	int state;
 
+	for (state = NUM_STATES - 1; state >= ACTIVE_STATE; state--) {
+		us = &ucassist_sleep_data[state];
+		if (css_num < us->css_num_data)
+			us->css_data[css_num].css = css;
+	}
+}
+
+static void ucassist_update_fn(struct kthread_work *work)
+{
+	const struct ucassist_sleep_struct *us;
+	struct ucassist_css_struct *uc;
+	unsigned long timeout;
+	static int prev_state = ACTIVE_STATE;
+	int state, css_num;
+
+	del_timer(&ucassist.input_timer);
+
 	/* Start from the deepest state towards the shallowest */
-	for (state = MAX_STATES - 1; state > ZERO_SLEEP_STATE; state--) {
-		if (test_bit(state, &ucassist_sleep_states))
+	for (state = NUM_STATES - 1; state > ACTIVE_STATE; state--) {
+		if (test_bit(state, &ucassist.sleep_states))
 			break;
 	}
 
-	us = &ucassist_sleep_data[state];
-	ucassist_sched_uclamp_set(us->uclamp_min, us->uclamp_max);
+	if (state != prev_state) {
+		prev_state = state;
+
+		us = &ucassist_sleep_data[state];
+		ucassist_sched_uclamp_set(us->uclamp_min, us->uclamp_max);
+
+		for (css_num = TOP_APP_CSS; css_num < us->css_num_data; css_num++) {
+			uc = &us->css_data[css_num];
+			if (uc->css)
+				ucassist_set_css_uclamp_data(uc->css, uc->data);
+		}
+	}
+
+	if (state == ACTIVE_STATE) {
+		timeout = jiffies + msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
+		mod_timer(&ucassist.input_timer, timeout);
+		atomic_set(&ucassist.input_pending, 0);
+		pr_debug("input timer set\n");
+	}
 }
-static DECLARE_WORK(ucassist_state_update_work, ucassist_state_update_fn);
 
 static void ucassist_set_sleep_state(unsigned int state, bool set)
 {
-	if (set)
-		set_bit(state, &ucassist_sleep_states);
-	else
-		clear_bit(state, &ucassist_sleep_states);
+	if (test_bit(state, &ucassist.sleep_states) != set) {
+		if (set)
+			set_bit(state, &ucassist.sleep_states);
+		else
+			clear_bit(state, &ucassist.sleep_states);
+	}
 
-	schedule_work(&ucassist_state_update_work);
+	kthread_queue_work(&ucassist.worker, &ucassist.update_work);
 }
 
-static void ucassist_input_timer_func(unsigned long data)
+static void ucassist_input_timer_fn(unsigned long data)
 {
 	pr_debug("input timer expired\n");
 	ucassist_set_sleep_state(INPUT_SLEEP_STATE, true);
 }
-static DEFINE_TIMER(ucassist_input_timer, ucassist_input_timer_func, 0, 0);
 
-static void ucassist_trigger_input_fn(struct irq_work *irq_work)
+static void ucassist_input_fn(struct irq_work *irq_work)
 {
-	unsigned long timeout = jiffies + msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
-
-	if (!mod_timer(&ucassist_input_timer, timeout)) {
-		pr_debug("input timer set\n");
-		ucassist_set_sleep_state(INPUT_SLEEP_STATE, false);
-	}
+	ucassist_set_sleep_state(INPUT_SLEEP_STATE, false);
 }
-static DEFINE_IRQ_WORK(ucassist_trigger_input_work, ucassist_trigger_input_fn);
 
 static void ucassist_input_trigger_timer(void)
 {
-	static DEFINE_RAW_SPINLOCK(trigger_lock);
-
 	if (unlikely(!ucassist_restrict_enabled))
 		return;
 
-	/* Prevent multiple concurrent access */
-	if (raw_spin_trylock(&trigger_lock)) {
-		irq_work_queue(&ucassist_trigger_input_work);
-		raw_spin_unlock(&trigger_lock);
-	}
+	/* Ignore updates until we've updated the timer */
+	if (atomic_cmpxchg(&ucassist.input_pending, 0, 1))
+		return;
+
+	irq_work_queue(&ucassist.input_work);
 }
 
 #ifdef CONFIG_FB
@@ -309,12 +392,12 @@ static int ucassist_fb_notifier_callback(struct notifier_block *self,
 	if (*blank == FB_BLANK_UNBLANK) {
 		ucassist_set_sleep_state(FB_SLEEP_STATE, false);
 		/* Trigger input as well to prevent capping wake performance */
-		ucassist_input_trigger_timer();
+		ucassist_set_sleep_state(INPUT_SLEEP_STATE, false);
 	} else if (*blank == FB_BLANK_POWERDOWN) {
 		ucassist_set_sleep_state(FB_SLEEP_STATE, true);
 	}
 
-	pr_debug("sleep_states = %lu\n", ucassist_sleep_states);
+	pr_debug("sleep_states = %lu\n", ucassist.sleep_states);
 
 	return 0;
 }
@@ -326,29 +409,50 @@ static struct notifier_block ucassist_fb_notif = {
 
 static int __init ucassist_init(void)
 {
-	const struct ucassist_sleep_struct *us;
-	int i, ret;
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
+	struct task_struct *thread;
+	int ret;
 
-	/* Check values in the scale data for invalid values */
-	for (i = MAX_STATES - 1; i >= 0; i--) {
-		us = &ucassist_sleep_data[i];
-		if (us->uclamp_min > us->uclamp_max || 
-		    us->uclamp_max > SCHED_CAPACITY_SCALE) {
-			pr_err("Invalid values! idx = %d\n", i);
-			return -EINVAL;
-		}
+	kthread_init_work(&ucassist.update_work, ucassist_update_fn);
+	kthread_init_worker(&ucassist.worker);
+	thread = kthread_create(kthread_worker_fn, &ucassist.worker, 
+			        "ucassist");
+	if (IS_ERR(thread)) {
+		ret = PTR_ERR(thread);
+		pr_err("Cannot run kthread! ret = %d\n", ret);
+		goto err;
 	}
+
+	ret = sched_setscheduler_nocheck(thread, SCHED_FIFO, &param);
+	if (ret) {
+		pr_err("failed to set SCHED_FIFO\n");
+		goto err_thread;
+	}
+
+	wake_up_process(thread);
+
+	ucassist.input_timer.data = 0;
+	ucassist.input_timer.expires = 0;
+	ucassist.input_timer.function = ucassist_input_timer_fn;
+	init_timer(&ucassist.input_timer);
+
+	init_irq_work(&ucassist.input_work, ucassist_input_fn);
 
 #ifdef CONFIG_FB
 	ret = fb_register_client(&ucassist_fb_notif);
 	if (ret) {
 		pr_err("Failed to init fb_notifier\n");
-		return ret;
+		goto err_thread;
 	}
 #endif
 
 	ucassist_restrict_enabled = true;
-	pr_warn("ucassist restricts access to UCLAMP sysctl");
+	pr_warn("ucassist restricts access to UCLAMP values");
 	return 0;
+
+err_thread:
+	kthread_stop(thread);
+err:
+	return ret;
 }
 module_init(ucassist_init);
