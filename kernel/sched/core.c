@@ -1367,7 +1367,7 @@ static int uclamp_validate(struct task_struct *p,
 	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX)
 		upper_bound = attr->sched_util_max;
 
-	ucassist_get_task_uclamp_data(p, &lower_bound, &upper_bound);
+	ucassist_get_task_uclamp_data(p, &lower_bound, &upper_bound, 0);
 
 	if (lower_bound > upper_bound)
 		return -EINVAL;
@@ -1386,11 +1386,12 @@ static int uclamp_validate(struct task_struct *p,
 	return 0;
 }
 
-static int __setscheduler_ucassist(struct task_struct *p)
+static int __setscheduler_ucassist(struct task_struct *p, 
+				unsigned int flags)
 {
 	unsigned int prev_min, prev_max, min, max;
 
-	if (ucassist_get_task_uclamp_data(p, &min, &max))
+	if (ucassist_get_task_uclamp_data(p, &min, &max, flags))
 		return -EINVAL;
 
 	prev_min = p->uclamp_req[UCLAMP_MIN].value;
@@ -1408,14 +1409,15 @@ static int __setscheduler_ucassist(struct task_struct *p)
 	return 0;
 }
 
-int setscheduler_task_ucassist(struct task_struct *p)
+int setscheduler_task_ucassist(struct task_struct *p, 
+				unsigned int flags)
 {
 	struct rq_flags rf;
 	struct rq *rq;
 	int ret;
 
 	rq = task_rq_lock(p, &rf);
-	ret = __setscheduler_ucassist(p);
+	ret = __setscheduler_ucassist(p, flags);
 	task_rq_unlock(rq, p, &rf);
 
 	return ret;
@@ -1450,7 +1452,7 @@ static void __setscheduler_uclamp(struct task_struct *p,
 	}
 
 	/* If the task is defined in UCASSIST, override userspace values */
-	if (!__setscheduler_ucassist(p))
+	if (!__setscheduler_ucassist(p, 0))
 		return;
 
 	if (likely(!(attr->sched_flags & SCHED_FLAG_UTIL_CLAMP)))
