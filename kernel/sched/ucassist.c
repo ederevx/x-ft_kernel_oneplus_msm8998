@@ -22,11 +22,8 @@
 #define SCHED_CAPACITY_SCALE_PERC(perc) \
 		((perc * SCHED_CAPACITY_SCALE) / 100)
 
-#define DISPLAY_UCLAMP_MIN_PERC 30
-#define DISPLAY_UCLAMP_MIN SCHED_CAPACITY_SCALE_PERC(DISPLAY_UCLAMP_MIN_PERC)
-
-#define GPU_UCLAMP_MIN_PERC 20
-#define GPU_UCLAMP_MIN SCHED_CAPACITY_SCALE_PERC(GPU_UCLAMP_MIN_PERC)
+#define DISPLAY_UCLAMP_MIN	SCHED_CAPACITY_SCALE_PERC(30)
+#define GPU_UCLAMP_MIN		SCHED_CAPACITY_SCALE_PERC(20)
 
 /* Disable UCLAMP restriction for 1 second after last input event */
 #define INPUT_EVENT_TIMEOUT_MS 1000
@@ -76,6 +73,7 @@ struct ucassist_task_struct {
 	const char target[TASK_COMM_LEN];
 	unsigned int uclamp_max;
 	unsigned int uclamp_min;
+	unsigned int flags;
 	bool trigger_input;
 };
 
@@ -100,11 +98,11 @@ bool ucassist_restrict_enabled __read_mostly = false;
 static const struct ucassist_css_struct ucassist_css_data[] = {
 	[TOP_APP_CSS] = {
 		.name = "top-app",
-		.data = { "max", "10", 1, 1 },
+		.data = { "max", "20", 1, 1 },
 	},
 	[FG_CSS] = {
 		.name = "foreground",
-		.data = { "max", "0", 0, 0 },
+		.data = { "max", "0", 1, 0 },
 	},
 	[BG_CSS] = {
 		.name = "background",
@@ -136,29 +134,23 @@ static struct ucassist_css_struct ucassist_active_css_data[] = {
 
 static struct ucassist_css_struct ucassist_input_sleep_css_data[] = {
 	[TOP_APP_CSS] = {
-		.data = { "max", "10", 1, 0 },
+		.data = { "max", "0", 1, 0 },
 	},
 };
-
-#ifdef CONFIG_FB
-static struct ucassist_css_struct ucassist_fb_sleep_css_data[] = {
-	[TOP_APP_CSS] = {
-		.data = { "max", "0", 0, 0 },
-	},
-};
-#endif
 
 static const struct ucassist_task_struct ucassist_task_data[] = {
 	{
 		.target = "composer",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
+		.flags = DISPLAY_UCFLAG,
 		.trigger_input = false,
 	},
 	{
 		.target = "Gralloc",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = GPU_UCLAMP_MIN,
+		.flags = GPU_UCFLAG,
 		.trigger_input = false,
 	},
 	{
@@ -177,6 +169,7 @@ static const struct ucassist_task_struct ucassist_task_data[] = {
 		.target = "Render",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
+		.flags = GPU_UCFLAG,
 		.trigger_input = true,
 	},
 	{
@@ -210,8 +203,6 @@ static const struct ucassist_sleep_struct ucassist_sleep_data[] = {
 	[FB_SLEEP_STATE] = {
 		.uclamp_max = SCHED_CAPACITY_SCALE_PERC(50),
 		.uclamp_min = 0,
-		.css_data = ucassist_fb_sleep_css_data,
-		.css_num_data = ARRAY_SIZE(ucassist_fb_sleep_css_data),
 	},
 #endif
 };
@@ -264,13 +255,18 @@ int ucassist_init_cpu_values(struct cgroup_subsys_state *css)
 static void ucassist_input_trigger_timer(void);
 
 int ucassist_get_task_uclamp_data(struct task_struct *p, 
-				unsigned int *min, unsigned int *max)
+				unsigned int *min, unsigned int *max,
+				unsigned int flags)
 {
 	const struct ucassist_task_struct *uc;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ucassist_task_data); i++) {
 		uc = &ucassist_task_data[i];
+
+		/* Only return data to caller that matches a target flag */
+		if ((uc->flags || flags) && !(uc->flags & flags))
+			continue;
 
 		if (likely(!strstr(p->comm, uc->target)))
 			continue;
