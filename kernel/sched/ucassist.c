@@ -254,7 +254,7 @@ int ucassist_init_cpu_values(struct cgroup_subsys_state *css)
 
 static void ucassist_input_trigger_timer(void);
 
-int ucassist_get_task_uclamp_data(struct task_struct *p, 
+int __ucassist_get_task_uclamp_data(const char *comm, 
 				unsigned int *min, unsigned int *max,
 				unsigned int flags)
 {
@@ -268,7 +268,7 @@ int ucassist_get_task_uclamp_data(struct task_struct *p,
 		if ((uc->flags || flags) && !(uc->flags & flags))
 			continue;
 
-		if (likely(!strstr(p->comm, uc->target)))
+		if (likely(!strstr(comm, uc->target)))
 			continue;
 
 		if (uc->trigger_input)
