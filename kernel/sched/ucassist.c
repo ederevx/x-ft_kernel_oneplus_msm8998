@@ -28,6 +28,9 @@
 /* Disable UCLAMP restriction for 1 second after last input event */
 #define INPUT_EVENT_TIMEOUT_MS 1000
 
+#define ALL_FILTER_UCFLAGS	\
+		(DISPLAY_UCFLAG | GPU_UCFLAG)
+
 int cpu_uclamp_write_css(struct cgroup_subsys_state *css, char *buf,
 					enum uclamp_id clamp_id);
 int cpu_uclamp_ls_write_u64(struct cgroup_subsys_state *css,
@@ -66,7 +69,6 @@ struct ucassist_css_struct {
 	const char *name;
 	struct cgroup_subsys_state *css;
 	struct uclamp_data data;
-	bool initialized;
 };
 
 struct ucassist_task_struct {
@@ -74,7 +76,6 @@ struct ucassist_task_struct {
 	unsigned int uclamp_max;
 	unsigned int uclamp_min;
 	unsigned int flags;
-	bool trigger_input;
 };
 
 struct ucassist_sleep_struct {
@@ -144,45 +145,38 @@ static const struct ucassist_task_struct ucassist_task_data[] = {
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
 		.flags = DISPLAY_UCFLAG,
-		.trigger_input = false,
 	},
 	{
 		.target = "Gralloc",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = GPU_UCLAMP_MIN,
 		.flags = GPU_UCFLAG,
-		.trigger_input = false,
 	},
 	{
 		.target = "kgsl_worker",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = GPU_UCLAMP_MIN,
-		.trigger_input = false,
 	},
 	{
 		.target = "mdss_fb",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.trigger_input = false,
 	},
 	{
 		.target = "Render",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.flags = GPU_UCFLAG,
-		.trigger_input = true,
+		.flags = GPU_UCFLAG | TRIGGER_UCFLAG,
 	},
 	{
 		.target = "surfaceflinger",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.trigger_input = false,
 	},
 	{
 		.target = "vsync_retire",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.trigger_input = false,
 	},
 };
 
@@ -254,6 +248,22 @@ int ucassist_init_cpu_values(struct cgroup_subsys_state *css)
 
 static void ucassist_input_trigger_timer(void);
 
+static inline bool ucassist_check_access(unsigned int target_flags, 
+				unsigned int flags)
+{
+	if (flags & ALL_FILTER_UCFLAGS) {
+		/* Return data to caller that matches a target filter flag */
+		if ((target_flags & flags) & ALL_FILTER_UCFLAGS)
+			return true;
+	} else {
+		/* Return data if the target doesn't require a filter flag */
+		if (!(target_flags & ALL_FILTER_UCFLAGS))
+			return true;
+	}
+
+	return false;
+}
+
 int __ucassist_get_task_uclamp_data(const char *comm, 
 				unsigned int *min, unsigned int *max,
 				unsigned int flags)
@@ -264,14 +274,14 @@ int __ucassist_get_task_uclamp_data(const char *comm,
 	for (i = 0; i < ARRAY_SIZE(ucassist_task_data); i++) {
 		uc = &ucassist_task_data[i];
 
-		/* Only return data to caller that matches a target flag */
-		if ((uc->flags || flags) && !(uc->flags & flags))
+		if (!ucassist_check_access(uc->flags, flags))
 			continue;
 
-		if (likely(!strstr(comm, uc->target)))
+		if (!strstr(comm, uc->target))
 			continue;
 
-		if (uc->trigger_input)
+		/* Trigger if the task and the caller has the trigger flag */
+		if ((uc->flags & flags) & TRIGGER_UCFLAG)
 			ucassist_input_trigger_timer();
 
 		*min = uc->uclamp_min;
