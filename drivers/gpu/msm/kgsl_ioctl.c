@@ -171,7 +171,7 @@ long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	struct kgsl_device *device = dev_priv->device;
 	long ret;
 
-	setscheduler_task_ucassist(current, GPU_UCFLAG);
+	setscheduler_task_ucassist(current, GPU_UCFLAG | TRIGGER_UCFLAG);
 
 	ret = kgsl_ioctl_helper(filep, cmd, arg, kgsl_ioctl_funcs,
 		ARRAY_SIZE(kgsl_ioctl_funcs));

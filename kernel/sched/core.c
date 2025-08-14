@@ -1413,13 +1413,12 @@ static inline void __setscheduler_ucassist_write(struct task_struct *p,
 	uclamp_se_set(&p->uclamp_req[UCLAMP_MAX], max, true);
 }
 
-static int __setscheduler_ucassist(struct task_struct *p, 
-				unsigned int flags)
+static int __setscheduler_ucassist(struct task_struct *p)
 {
 	unsigned int min, max;
 	int ret;
 
-	ret = __ucassist_get_task_uclamp_data(p->comm, &min, &max, flags);
+	ret = __ucassist_get_task_uclamp_data(p->comm, &min, &max, 0);
 	if (ret)
 		return ret;
 
@@ -5462,7 +5461,7 @@ recheck:
 	}
 
 	/* Enforce UCASSIST values regardless of policy change */
-	if (!__setscheduler_ucassist(p, 0))
+	if (!__setscheduler_ucassist(p))
 		goto change;
 
 	/*
