@@ -334,6 +334,8 @@ static void ucassist_update_fn(struct kthread_work *work)
 			if (uc->css)
 				ucassist_set_css_uclamp_data(uc->css, uc->data);
 		}
+
+		pr_info("sleep_state = %d\n", state);
 	}
 
 	if (state == ACTIVE_STATE) {
