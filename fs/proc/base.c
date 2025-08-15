@@ -1003,7 +1003,9 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 {
 	struct mm_struct *mm = NULL;
 	struct task_struct *task;
+#ifdef CONFIG_OOM_SCORE_NOTIFIER
 	int old_oom_score_adj = 0;
+#endif
 	int err = 0;
 
 	task = get_proc_task(file_inode(file));
