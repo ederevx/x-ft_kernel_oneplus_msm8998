@@ -1403,7 +1403,7 @@ static inline bool uclamp_has_user_defined(struct task_struct *p)
 	return false;
 }
 
-static inline void __setscheduler_ucassist_write(struct task_struct *p,
+static inline void uclamp_ucassist_set(struct task_struct *p,
 				unsigned int min, unsigned int max)
 {
 	pr_info("%s: setting values for %s: %d, %d", __func__, 
@@ -1425,7 +1425,7 @@ static int __setscheduler_ucassist(struct task_struct *p)
 	if (uclamp_has_user_defined(p))
 		return -EALREADY;
 
-	__setscheduler_ucassist_write(p, min, max);
+	uclamp_ucassist_set(p, min, max);
 	return 0;
 }
 
@@ -1434,6 +1434,7 @@ int setscheduler_task_ucassist(struct task_struct *p,
 {
 	struct rq_flags rf;
 	struct rq *rq;
+	enum uclamp_id clamp_id;
 	unsigned int min, max;
 	int ret;
 
@@ -1445,7 +1446,10 @@ int setscheduler_task_ucassist(struct task_struct *p,
 		return -EALREADY;
 
 	rq = task_rq_lock(p, &rf);
-	__setscheduler_ucassist_write(p, min, max);
+	uclamp_ucassist_set(p, min, max);
+	/* Have changes take effect immediately for the task */
+	for_each_clamp_id(clamp_id)
+		uclamp_rq_reinc_id(rq, p, clamp_id);
 	task_rq_unlock(rq, p, &rf);
 
 	return 0;
