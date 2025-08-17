@@ -87,6 +87,7 @@ struct ucassist_struct {
 	struct timer_list input_timer;
 	unsigned long sleep_states;
 	atomic_t input_pending;
+	atomic_long_t input_timestamp;
 };
 
 bool ucassist_restrict_enabled __read_mostly = false;
@@ -245,6 +246,7 @@ static const struct ucassist_sleep_struct ucassist_sleep_data[] = {
 static struct ucassist_struct ucassist = {
 	.sleep_states = 0,
 	.input_pending = ATOMIC_INIT(0),
+	.input_timestamp = ATOMIC_LONG_INIT(0),
 };
 
 static void ucassist_set_css_uclamp_data(struct cgroup_subsys_state *css,
@@ -407,7 +409,8 @@ static void ucassist_update_fn(struct kthread_work *work)
 	}
 
 	if (state == ACTIVE_STATE) {
-		timeout = jiffies + msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
+		timeout = atomic_long_read(&ucassist.input_timestamp);
+		timeout += msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
 		mod_timer(&ucassist.input_timer, timeout);
 		atomic_set(&ucassist.input_pending, 0);
 		pr_debug("input timer set\n");
@@ -428,8 +431,18 @@ static void ucassist_set_sleep_state(unsigned int state, bool set)
 
 static void ucassist_input_timer_fn(unsigned long data)
 {
+	unsigned long timeout;
+
+	/*
+	 * Set the sleep state if our timestamp + timeout is before 
+	 * or at the current jiffies. If not, trigger input at timeout 
+	 * to avoid needing to trigger soft IRQ at input event.
+	 */
+	timeout = atomic_long_read(&ucassist.input_timestamp);
+	timeout += msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
+
 	pr_debug("input timer expired\n");
-	ucassist_set_sleep_state(INPUT_SLEEP_STATE, true);
+	ucassist_set_sleep_state(INPUT_SLEEP_STATE, timeout <= jiffies);
 }
 
 static void ucassist_input_fn(struct irq_work *irq_work)
@@ -440,6 +453,12 @@ static void ucassist_input_fn(struct irq_work *irq_work)
 static void ucassist_input_trigger_timer(void)
 {
 	if (unlikely(!ucassist_restrict_enabled))
+		return;
+
+	atomic_long_set(&ucassist.input_timestamp, jiffies);
+
+	/* Only update timestamp if we're active */
+	if (!test_bit(INPUT_SLEEP_STATE, &ucassist.sleep_states))
 		return;
 
 	/* Ignore updates until we've updated the timer */
