@@ -28,8 +28,8 @@
 /* Disable UCLAMP restriction for 1 second after last input event */
 #define INPUT_EVENT_TIMEOUT_MS 1000
 
-#define ALL_FILTER_UCFLAGS	\
-		(DISPLAY_UCFLAG | GPU_UCFLAG)
+#define ALL_UCLFLAGS	\
+		(DISPLAY_UCLFLAG | GPU_UCLFLAG)
 
 int cpu_uclamp_write_css(struct cgroup_subsys_state *css, char *buf,
 					enum uclamp_id clamp_id);
@@ -37,17 +37,6 @@ int cpu_uclamp_ls_write_u64(struct cgroup_subsys_state *css,
 				   struct cftype *cftype, u64 ls);
 int cpu_uclamp_boosted_write_u64(struct cgroup_subsys_state *css,
 				   struct cftype *cftype, u64 ls);
-
-enum {
-	TOP_APP_CSS = 0,
-	FG_CSS,
-	BG_CSS,
-	SYS_BG_CSS,
-	DEX2OAT_CSS,
-	NNAPI_CSS,
-	CAMERA_CSS,
-	NUM_CSS,
-};
 
 enum {
 	ACTIVE_STATE = 0,
@@ -78,6 +67,12 @@ struct ucassist_task_struct {
 	unsigned int flags;
 };
 
+struct ucassist_task_list_struct {
+	const struct ucassist_task_struct *uctdata;
+	unsigned int uctdata_num;
+	unsigned int flags;	
+};
+
 struct ucassist_sleep_struct {
 	unsigned int uclamp_max;
 	unsigned int uclamp_min;
@@ -97,61 +92,94 @@ struct ucassist_struct {
 bool ucassist_restrict_enabled __read_mostly = false;
 
 static const struct ucassist_css_struct ucassist_css_data[] = {
-	[TOP_APP_CSS] = {
+	{
 		.name = "top-app",
-		.data = { "max", "20", 1, 1 },
+		.data = { "max", "20", 1, 0 },
 	},
-	[FG_CSS] = {
+	{
 		.name = "foreground",
 		.data = { "max", "0", 1, 0 },
 	},
-	[BG_CSS] = {
+	{
 		.name = "background",
 		.data = { "50", "0", 0, 0 },
 	},
-	[SYS_BG_CSS] = {
+	{
 		.name = "system-background",
 		.data = { "50", "0", 0, 0 },
 	},
-	[DEX2OAT_CSS] = {
+	{
 		.name = "dex2oat",
 		.data = { "60", "0", 0, 0 },
 	},
-	[NNAPI_CSS] = {
+	{
 		.name = "nnapi-hal",
 		.data = { "max", "50", 0, 0 },
 	},
-	[CAMERA_CSS] = {
+	{
 		.name = "camera-daemon",
 		.data = { "max", "10", 1, 0 },
 	},
 };
 
 static struct ucassist_css_struct ucassist_active_css_data[] = {
-	[TOP_APP_CSS] = {
-		.data = { "max", "20", 1, 1 },
+	{
+		.name = "top-app",
+		.data = { "max", "20", 1, 0 },
 	},
-};
-
-static struct ucassist_css_struct ucassist_input_sleep_css_data[] = {
-	[TOP_APP_CSS] = {
+	{
+		.name = "foreground",
 		.data = { "max", "0", 1, 0 },
 	},
 };
 
-static const struct ucassist_task_struct ucassist_task_data[] = {
+static struct ucassist_css_struct ucassist_input_sleep_css_data[] = {
+	{
+		.name = "top-app",
+		.data = { "max", "0", 1, 0 },
+	},
+	{
+		.name = "foreground",
+		.data = { "max", "0", 0, 0 },
+	},
+};
+
+#ifdef CONFIG_FB
+static struct ucassist_css_struct ucassist_fb_sleep_css_data[] = {
+	{
+		.name = "background",
+		.data = { "25", "0", 0, 0 },
+	},
+	{
+		.name = "system-background",
+		.data = { "25", "0", 0, 0 },
+	},
+};
+#endif
+
+static const struct ucassist_task_struct ucassist_display_task_data[] = {
 	{
 		.target = "composer",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.flags = DISPLAY_UCFLAG,
 	},
+};
+
+static const struct ucassist_task_struct ucassist_gpu_task_data[] = {
 	{
 		.target = "Gralloc",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = GPU_UCLAMP_MIN,
-		.flags = GPU_UCFLAG,
 	},
+	{
+		.target = "Render",
+		.uclamp_max = SCHED_CAPACITY_SCALE,
+		.uclamp_min = DISPLAY_UCLAMP_MIN,
+		.flags = TRIGGER_UCFLAG,
+	},
+};
+
+static const struct ucassist_task_struct ucassist_unfiltered_task_data[] = {
 	{
 		.target = "kgsl_worker",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
@@ -163,12 +191,6 @@ static const struct ucassist_task_struct ucassist_task_data[] = {
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
 	},
 	{
-		.target = "Render",
-		.uclamp_max = SCHED_CAPACITY_SCALE,
-		.uclamp_min = DISPLAY_UCLAMP_MIN,
-		.flags = GPU_UCFLAG | TRIGGER_UCFLAG,
-	},
-	{
 		.target = "surfaceflinger",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
@@ -177,6 +199,23 @@ static const struct ucassist_task_struct ucassist_task_data[] = {
 		.target = "vsync_retire",
 		.uclamp_max = SCHED_CAPACITY_SCALE,
 		.uclamp_min = DISPLAY_UCLAMP_MIN,
+	},
+};
+
+static const struct ucassist_task_list_struct ucassist_task_data_list[] = {
+	{
+		.uctdata = ucassist_display_task_data,
+		.uctdata_num = ARRAY_SIZE(ucassist_display_task_data),
+		.flags = DISPLAY_UCLFLAG,
+	},
+	{
+		.uctdata = ucassist_gpu_task_data,
+		.uctdata_num = ARRAY_SIZE(ucassist_gpu_task_data),
+		.flags = GPU_UCLFLAG,		
+	},
+	{
+		.uctdata = ucassist_unfiltered_task_data,
+		.uctdata_num = ARRAY_SIZE(ucassist_unfiltered_task_data),
 	},
 };
 
@@ -197,6 +236,8 @@ static const struct ucassist_sleep_struct ucassist_sleep_data[] = {
 	[FB_SLEEP_STATE] = {
 		.uclamp_max = SCHED_CAPACITY_SCALE_PERC(50),
 		.uclamp_min = 0,
+		.css_data = ucassist_fb_sleep_css_data,
+		.css_num_data = ARRAY_SIZE(ucassist_fb_sleep_css_data),
 	},
 #endif
 };
@@ -220,72 +261,53 @@ static void ucassist_set_css_uclamp_data(struct cgroup_subsys_state *css,
 	cpu_uclamp_boosted_write_u64(css, NULL, cdata.boosted);
 }
 
-static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css, 
-				unsigned int css_num);
+static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css);
 
 int ucassist_init_cpu_values(struct cgroup_subsys_state *css)
 {
-	const struct ucassist_css_struct *uc;
-	int css_num = TOP_APP_CSS;
+	const struct ucassist_css_struct *ucs;
+	int i;
 
 	if (!css->cgroup->kn)
 		return -EINVAL;
 
-	for (; css_num < ARRAY_SIZE(ucassist_css_data); css_num++) {
-		uc = &ucassist_css_data[css_num];
+	for (i = 0; i < ARRAY_SIZE(ucassist_css_data); i++) {
+		ucs = &ucassist_css_data[i];
 
-		if (strcmp(css->cgroup->kn->name, uc->name))
+		if (strcmp(css->cgroup->kn->name, ucs->name))
 			continue;
 
-		pr_info("setting values for %s", uc->name);
-		ucassist_set_css_uclamp_data(css, uc->data);
-		ucassist_sleep_set_css_data(css, css_num);
+		pr_info("setting values for %s", ucs->name);
+		ucassist_set_css_uclamp_data(css, ucs->data);
 		break;
 	}
 
+	ucassist_sleep_set_css_data(css);
 	return 0;
 }
 
 static void ucassist_input_trigger_timer(void);
 
-static inline bool ucassist_check_access(unsigned int target_flags, 
-				unsigned int flags)
+static inline int 
+ucassist_set_target_data(const struct ucassist_task_list_struct *ucl,
+				const char *comm, unsigned int *min, 
+				unsigned int *max, unsigned int flags)
 {
-	if (flags & ALL_FILTER_UCFLAGS) {
-		/* Return data to caller that matches a target filter flag */
-		if ((target_flags & flags) & ALL_FILTER_UCFLAGS)
-			return true;
-	} else {
-		/* Return data if the target doesn't require a filter flag */
-		if (!(target_flags & ALL_FILTER_UCFLAGS))
-			return true;
-	}
-
-	return false;
-}
-
-int __ucassist_get_task_uclamp_data(const char *comm, 
-				unsigned int *min, unsigned int *max,
-				unsigned int flags)
-{
-	const struct ucassist_task_struct *uc;
+	const struct ucassist_task_struct *uct;
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(ucassist_task_data); i++) {
-		uc = &ucassist_task_data[i];
+	for (i = 0; i < ucl->uctdata_num; i++) {
+		uct = &ucl->uctdata[i];
 
-		if (!ucassist_check_access(uc->flags, flags))
-			continue;
-
-		if (!strstr(comm, uc->target))
+		if (!strstr(comm, uct->target))
 			continue;
 
 		/* Trigger if the task and the caller has the trigger flag */
-		if ((uc->flags & flags) & TRIGGER_UCFLAG)
+		if ((uct->flags & flags) & TRIGGER_UCFLAG)
 			ucassist_input_trigger_timer();
 
-		*min = uc->uclamp_min;
-		*max = uc->uclamp_max;
+		*min = uct->uclamp_min;
+		*max = uct->uclamp_max;
 
 		pr_warn_once("ucassist overrides task UCLAMPs\n");
 		return 0;
@@ -294,26 +316,72 @@ int __ucassist_get_task_uclamp_data(const char *comm,
 	return -EINVAL;
 }
 
-static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css, 
-				unsigned int css_num)
+static inline bool ucassist_check_if_target(unsigned int target_flags, 
+				unsigned int flags)
+{
+	/* Only consider UCLFLAGs */
+	flags &= ALL_UCLFLAGS;
+	target_flags &= ALL_UCLFLAGS;
+
+	/* Return data to caller that matches a target list flag */
+	if (flags && (target_flags & flags))
+		return true;
+
+	/* Return data if caller and target don't require a list flag */
+	if (!flags && !target_flags)
+		return true;
+
+	return false;
+}
+
+int __ucassist_get_task_uclamp_data(const char *comm, 
+				unsigned int *min, unsigned int *max,
+				unsigned int flags)
+{
+	const struct ucassist_task_list_struct *ucl;
+	int ret = -EINVAL, i;
+
+	for (i = 0; i < ARRAY_SIZE(ucassist_task_data_list); i++) {
+		ucl = &ucassist_task_data_list[i];
+
+		if (!ucassist_check_if_target(ucl->flags, flags))
+			continue;
+
+		ret = ucassist_set_target_data(ucl, comm, min, max, flags);
+		if (!ret)
+			break;
+	}
+
+	return ret;
+}
+
+static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css)
 {
 	const struct ucassist_sleep_struct *us;
-	int state;
+	struct ucassist_css_struct *ucs;
+	int state, i;
 
 	for (state = NUM_STATES - 1; state >= ACTIVE_STATE; state--) {
 		us = &ucassist_sleep_data[state];
-		if (css_num < us->css_num_data)
-			us->css_data[css_num].css = css;
+		for (i = 0; i < us->css_num_data; i++) {
+			ucs = &us->css_data[i];
+
+			if (strcmp(css->cgroup->kn->name, ucs->name))
+				continue;
+
+			ucs->css = css;
+			break;
+		}
 	}
 }
 
 static void ucassist_update_fn(struct kthread_work *work)
 {
 	const struct ucassist_sleep_struct *us;
-	struct ucassist_css_struct *uc;
+	struct ucassist_css_struct *ucs;
 	unsigned long timeout;
 	static int prev_state = ACTIVE_STATE;
-	int state, css_num;
+	int state, i;
 
 	del_timer(&ucassist.input_timer);
 
@@ -329,10 +397,10 @@ static void ucassist_update_fn(struct kthread_work *work)
 		us = &ucassist_sleep_data[state];
 		ucassist_sched_uclamp_set(us->uclamp_min, us->uclamp_max);
 
-		for (css_num = TOP_APP_CSS; css_num < us->css_num_data; css_num++) {
-			uc = &us->css_data[css_num];
-			if (uc->css)
-				ucassist_set_css_uclamp_data(uc->css, uc->data);
+		for (i = 0; i < us->css_num_data; i++) {
+			ucs = &us->css_data[i];
+			if (ucs && ucs->css)
+				ucassist_set_css_uclamp_data(ucs->css, ucs->data);
 		}
 
 		pr_info("sleep_state = %d\n", state);

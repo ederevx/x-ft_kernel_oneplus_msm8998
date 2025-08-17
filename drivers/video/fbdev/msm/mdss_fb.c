@@ -5193,7 +5193,7 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	setscheduler_task_ucassist(current, DISPLAY_UCFLAG);
+	setscheduler_task_ucassist(current, DISPLAY_UCLFLAG);
 
 	atomic_inc(&mfd->ioctl_ref_cnt);
 
