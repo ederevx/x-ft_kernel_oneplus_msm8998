@@ -5,10 +5,10 @@
 #include <linux/cgroup.h>
 
 /* Flags for filtering tasks */
-#define DISPLAY_UCFLAG	0x001
-#define GPU_UCFLAG		0x002
+#define DISPLAY_UCLFLAG	0x001
+#define GPU_UCLFLAG		0x002
 
-/* Special flags */
+/* Special task-specific flags */
 #define TRIGGER_UCFLAG	0x010
 
 extern bool ucassist_restrict_enabled;
