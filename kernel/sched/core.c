@@ -1442,16 +1442,18 @@ int setscheduler_task_ucassist(struct task_struct *p,
 	if (ret)
 		return ret;
 
-	if (uclamp_has_user_defined(p))
-		return -EALREADY;
-
 	rq = task_rq_lock(p, &rf);
+	if (uclamp_has_user_defined(p)) {
+		task_rq_unlock(rq, p, &rf);
+		return -EALREADY;
+	}
+
 	uclamp_ucassist_set(p, min, max);
 	/* Have changes take effect immediately for the task */
 	for_each_clamp_id(clamp_id)
 		uclamp_rq_reinc_id(rq, p, clamp_id);
-	task_rq_unlock(rq, p, &rf);
 
+	task_rq_unlock(rq, p, &rf);
 	return 0;
 }
 EXPORT_SYMBOL(setscheduler_task_ucassist);
