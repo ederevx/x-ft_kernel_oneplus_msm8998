@@ -1422,7 +1422,7 @@ static int __setscheduler_ucassist(struct task_struct *p)
 	if (ret)
 		return ret;
 
-	if (uclamp_has_user_defined(p))
+	if (likely(uclamp_has_user_defined(p)))
 		return -EALREADY;
 
 	uclamp_ucassist_set(p, min, max);
@@ -1443,7 +1443,7 @@ int setscheduler_task_ucassist(struct task_struct *p,
 		return ret;
 
 	rq = task_rq_lock(p, &rf);
-	if (uclamp_has_user_defined(p)) {
+	if (likely(uclamp_has_user_defined(p))) {
 		task_rq_unlock(rq, p, &rf);
 		return -EALREADY;
 	}
