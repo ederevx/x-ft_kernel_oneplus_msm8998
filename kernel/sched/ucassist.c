@@ -86,7 +86,6 @@ struct ucassist_struct {
 	struct irq_work input_work;
 	struct timer_list input_timer;
 	unsigned long sleep_states;
-	atomic_t input_pending;
 	atomic_long_t input_timestamp;
 };
 
@@ -245,7 +244,6 @@ static const struct ucassist_sleep_struct ucassist_sleep_data[] = {
 
 static struct ucassist_struct ucassist = {
 	.sleep_states = 0,
-	.input_pending = ATOMIC_INIT(0),
 	.input_timestamp = ATOMIC_LONG_INIT(0),
 };
 
@@ -377,15 +375,24 @@ static void ucassist_sleep_set_css_data(struct cgroup_subsys_state *css)
 	}
 }
 
+static inline unsigned long ucassist_get_input_timeout(void)
+{
+	unsigned long timestamp = atomic_long_read(&ucassist.input_timestamp);
+	return timestamp + msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
+}
+
+static inline void ucassist_update_input_timer(unsigned long timeout)
+{
+	mod_timer(&ucassist.input_timer, timeout);
+	pr_debug("input timer set\n");
+}
+
 static void ucassist_update_fn(struct kthread_work *work)
 {
 	const struct ucassist_sleep_struct *us;
 	struct ucassist_css_struct *ucs;
-	unsigned long timeout;
 	static int prev_state = ACTIVE_STATE;
 	int state, i;
-
-	del_timer(&ucassist.input_timer);
 
 	/* Start from the deepest state towards the shallowest */
 	for (state = NUM_STATES - 1; state > ACTIVE_STATE; state--) {
@@ -393,61 +400,57 @@ static void ucassist_update_fn(struct kthread_work *work)
 			break;
 	}
 
-	if (state != prev_state) {
-		prev_state = state;
+	if (state == prev_state)
+		return;
+	prev_state = state;
 
-		us = &ucassist_sleep_data[state];
-		ucassist_sched_uclamp_set(us->uclamp_min, us->uclamp_max);
+	del_timer(&ucassist.input_timer);
 
-		for (i = 0; i < us->css_num_data; i++) {
-			ucs = &us->css_data[i];
-			if (ucs && ucs->css)
-				ucassist_set_css_uclamp_data(ucs->css, ucs->data);
-		}
+	us = &ucassist_sleep_data[state];
+	ucassist_sched_uclamp_set(us->uclamp_min, us->uclamp_max);
 
-		pr_info("sleep_state = %d\n", state);
+	for (i = 0; i < us->css_num_data; i++) {
+		ucs = &us->css_data[i];
+		if (ucs && ucs->css)
+			ucassist_set_css_uclamp_data(ucs->css, ucs->data);
 	}
 
-	if (state == ACTIVE_STATE) {
-		timeout = atomic_long_read(&ucassist.input_timestamp);
-		timeout += msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
-		mod_timer(&ucassist.input_timer, timeout);
-		atomic_set(&ucassist.input_pending, 0);
-		pr_debug("input timer set\n");
-	}
+	pr_info("sleep_state = %d\n", state);
+
+	if (state == ACTIVE_STATE)
+		ucassist_update_input_timer(ucassist_get_input_timeout());
 }
 
-static void ucassist_set_sleep_state(unsigned int state, bool set)
+static inline void ucassist_set_sleep_state(unsigned int state, bool set)
 {
-	if (test_bit(state, &ucassist.sleep_states) != set) {
-		if (set)
-			set_bit(state, &ucassist.sleep_states);
-		else
-			clear_bit(state, &ucassist.sleep_states);
-	}
+	if (set)
+		set_bit(state, &ucassist.sleep_states);
+	else
+		clear_bit(state, &ucassist.sleep_states);
 
 	kthread_queue_work(&ucassist.worker, &ucassist.update_work);
 }
 
 static void ucassist_input_timer_fn(unsigned long data)
 {
-	unsigned long timeout;
+	unsigned long timeout = ucassist_get_input_timeout();
+
+	pr_debug("input timer expired\n");
 
 	/*
 	 * Set the sleep state if our timestamp + timeout is before 
 	 * or at the current jiffies. If not, trigger input at timeout 
 	 * to avoid needing to trigger soft IRQ at input event.
 	 */
-	timeout = atomic_long_read(&ucassist.input_timestamp);
-	timeout += msecs_to_jiffies(INPUT_EVENT_TIMEOUT_MS);
-
-	pr_debug("input timer expired\n");
-	ucassist_set_sleep_state(INPUT_SLEEP_STATE, timeout <= jiffies);
+	if (timeout <= jiffies)
+		ucassist_set_sleep_state(INPUT_SLEEP_STATE, true);
+	else
+		ucassist_update_input_timer(timeout);
 }
 
 static void ucassist_input_fn(struct irq_work *irq_work)
 {
-	ucassist_set_sleep_state(INPUT_SLEEP_STATE, false);
+	kthread_queue_work(&ucassist.worker, &ucassist.update_work);
 }
 
 static void ucassist_input_trigger_timer(void)
@@ -458,11 +461,7 @@ static void ucassist_input_trigger_timer(void)
 	atomic_long_set(&ucassist.input_timestamp, jiffies);
 
 	/* Only update timestamp if we're active */
-	if (!test_bit(INPUT_SLEEP_STATE, &ucassist.sleep_states))
-		return;
-
-	/* Ignore updates until we've updated the timer */
-	if (atomic_cmpxchg(&ucassist.input_pending, 0, 1))
+	if (!test_and_clear_bit(INPUT_SLEEP_STATE, &ucassist.sleep_states))
 		return;
 
 	irq_work_queue(&ucassist.input_work);
@@ -486,7 +485,8 @@ static int ucassist_fb_notifier_callback(struct notifier_block *self,
 
 	if (*blank == FB_BLANK_UNBLANK) {
 		ucassist_set_sleep_state(FB_SLEEP_STATE, false);
-		/* Trigger input as well to prevent capping wake performance */
+		/* Update input as well to prevent capping wake performance */
+		atomic_long_set(&ucassist.input_timestamp, jiffies);
 		ucassist_set_sleep_state(INPUT_SLEEP_STATE, false);
 	} else if (*blank == FB_BLANK_POWERDOWN) {
 		ucassist_set_sleep_state(FB_SLEEP_STATE, true);
