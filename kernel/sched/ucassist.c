@@ -25,8 +25,8 @@
 #define DISPLAY_UCLAMP_MIN	SCHED_CAPACITY_SCALE_PERC(30)
 #define GPU_UCLAMP_MIN		SCHED_CAPACITY_SCALE_PERC(20)
 
-/* Disable UCLAMP restriction for 1 second after last input event */
-#define INPUT_EVENT_TIMEOUT_MS 1000
+/* Disable UCLAMP restriction for 100ms after last input event */
+#define INPUT_EVENT_TIMEOUT_MS 100
 
 #define ALL_UCLFLAGS	\
 		(DISPLAY_UCLFLAG | GPU_UCLFLAG)
@@ -415,7 +415,7 @@ static void ucassist_update_fn(struct kthread_work *work)
 			ucassist_set_css_uclamp_data(ucs->css, ucs->data);
 	}
 
-	pr_info("sleep_state = %d\n", state);
+	pr_debug("sleep_state = %d\n", state);
 
 	if (state == ACTIVE_STATE)
 		ucassist_update_input_timer(ucassist_get_input_timeout());
@@ -491,8 +491,6 @@ static int ucassist_fb_notifier_callback(struct notifier_block *self,
 	} else if (*blank == FB_BLANK_POWERDOWN) {
 		ucassist_set_sleep_state(FB_SLEEP_STATE, true);
 	}
-
-	pr_debug("sleep_states = %lu\n", ucassist.sleep_states);
 
 	return 0;
 }
