@@ -31,14 +31,11 @@
 
 #define DETECT_CNT             3
 
-#define TIMEOUT_CNT            5
-
 struct op_cg_uovp_data {
 	struct smb_charger *chg;
 
 	int counter;
 
-	int not_uovp_timeout;
 	int vchg_mv;
 
 	bool last_uovp_state;
@@ -140,11 +137,11 @@ static int op_cg_current_inc_dec(struct op_cg_uovp_data *opdata,
 	}
 
 	if (icl_ua != target_icl_ua) {
-		pr_info("target_icl_ua=%d", target_icl_ua);
+		pr_info("set target_icl_ua=%d", target_icl_ua);
 		ret = op_cg_current_set(opdata, target_icl_ua);
 	} else {
-		pr_err("icl_ua already at %d mA", (target_icl_ua / 1000));
-		ret = -EINVAL;
+		pr_debug("icl_ua already at %d mA", (target_icl_ua / 1000));
+		ret = -EALREADY;
 	}
 	return ret;
 }
@@ -232,7 +229,6 @@ static void op_cg_detect_uovp(struct op_cg_uovp_data *opdata)
 static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 {
 	struct smb_charger *chg = opdata->chg;
-	int ret;
 
 	if (!op_cg_evaluate_state_counter(opdata, false)) {
 		pr_info("normal counter=%d", opdata->counter);
@@ -248,26 +244,14 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 	/* Reset the counter if we will increase the current */
 	opdata->counter = 0;
 
-	/* Wait for timeout to be cleared before trying again */
-	if (opdata->not_uovp_timeout > 0) {
-		opdata->not_uovp_timeout--;
-		return;
-	}
-
 	/* Increase the current if not undervolt for @DETECT_CNT 
-	   iterations and we're not in timeout */
-	ret = op_cg_current_inc_dec(opdata, true);
-	if (!ret) {
-		/* Timeout and revert if we are under/overvoltage or can't 
-		   evaluate */
-		if (op_cg_reevaluate_uovp(opdata, false)) {
-			ret = -ETIMEDOUT;
-			op_cg_current_inc_dec(opdata, false);
-		}
-	}
+	   iterations */
+	if (op_cg_current_inc_dec(opdata, true))
+		return;
 
-	if (ret < 0)
-		opdata->not_uovp_timeout = TIMEOUT_CNT;
+	/* Revert if we are under/overvoltage or can't evaluate */
+	if (op_cg_reevaluate_uovp(opdata, false))
+		op_cg_current_inc_dec(opdata, false);
 }
 
 void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
