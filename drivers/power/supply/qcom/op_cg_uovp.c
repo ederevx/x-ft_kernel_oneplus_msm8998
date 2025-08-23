@@ -251,7 +251,7 @@ static void op_cg_detect_normal(struct op_cg_uovp_data *opdata)
 
 	/* Revert if we are under/overvoltage or can't evaluate */
 	if (op_cg_reevaluate_uovp(opdata, false))
-		op_cg_current_inc_dec(opdata, false);
+		op_cg_detect_uovp(opdata);
 }
 
 void op_check_charger_uovp(struct smb_charger *chg, int vchg_mv)
