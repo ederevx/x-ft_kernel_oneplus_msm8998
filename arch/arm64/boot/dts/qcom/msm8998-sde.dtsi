@@ -47,8 +47,8 @@
 		clock-max-rate = <0 0 0 550000000 550000000 0 0 0 0 19200000 550000000>;
 
 		/* interrupt config */
-		interrupt-parent = <&intc>;
-		interrupts = <0 83 0>;
+		interrupt-parent = <&wakegic>;
+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-controller;
 		#interrupt-cells = <1>;
 		iommus = <&mmss_smmu 0>;

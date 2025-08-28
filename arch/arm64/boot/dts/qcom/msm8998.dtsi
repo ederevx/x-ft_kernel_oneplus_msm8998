@@ -629,7 +629,7 @@
 			<0x800a000 0x3000>;
 		reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
 		interrupt-names = "periph_irq";
-		interrupts = <GIC_SPI 326 IRQ_TYPE_NONE>;
+		interrupts = <GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH>;
 		qcom,ee = <0>;
 		qcom,channel = <0>;
 		qcom,reserved-chan = <511>;
@@ -649,7 +649,7 @@
 	uartblsp1dm1: serial@0c170000 {
 		compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
 		reg = <0xc170000 0x1000>;
-		interrupts = <0 108 0>;
+		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
 		clocks = <&clock_gcc GCC_BLSP1_UART2_APPS_CLK>,
 			 <&clock_gcc GCC_BLSP1_AHB_CLK>;
@@ -659,7 +659,7 @@
 	uartblsp2dm1: serial@0c1b0000 {
 		compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
 		reg = <0xc1b0000 0x1000>;
-		interrupts = <0 114 0>;
+		interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
 		clocks = <&clock_gcc GCC_BLSP2_UART2_APPS_CLK>,
 			 <&clock_gcc GCC_BLSP2_AHB_CLK>;
@@ -1623,7 +1623,8 @@
 		reg = <0xc0a4900 0x314>, <0xc0a4000 0x800>;
 		reg-names = "hc_mem", "core_mem";
 
-		interrupts = <0 125 0>, <0 221 0>;
+		interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>, 
+					 <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "hc_irq", "pwr_irq";
 
 		clock-names = "iface_clk", "core_clk";
@@ -1708,7 +1709,7 @@
 	ufs1: ufshc@1da4000 {
 		compatible = "qcom,ufshc";
 		reg = <0x1da4000 0x2500>;
-		interrupts = <0 265 0>;
+		interrupts = <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>;
 		phys = <&ufsphy1>;
 		phy-names = "ufsphy";
 		ufs-qcom-crypto = <&ufs_ice>;
@@ -1814,7 +1815,9 @@
 		#size-cells = <1>;
 		ranges;
 
-		interrupts = <0 347 0>, <0 243 0>,  <0 180 0>;
+		interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH>, 
+					 <GIC_SPI 243 IRQ_TYPE_LEVEL_HIGH>,  
+					 <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "hs_phy_irq", "ss_phy_irq", "pwr_event_irq";
 
 		USB3_GDSC-supply = <&gdsc_usb30>;
@@ -1858,8 +1861,7 @@
 		dwc3@a800000 {
 			compatible = "snps,dwc3";
 			reg = <0x0a800000 0xcd00>;
-			interrupt-parent = <&intc>;
-			interrupts = <0 131 0>;
+			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
 			usb-phy = <&qusb_phy0>, <&ssphy>;
 			tx-fifo-resize;
 			linux,sysdev_is_parent;
@@ -1876,8 +1878,7 @@
 		qcom,usbbam@a904000 {
 			compatible = "qcom,usb-bam-msm";
 			reg = <0xa904000 0x17000>;
-			interrupt-parent = <&intc>;
-			interrupts = <0 132 0>;
+			interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
 
 			qcom,bam-type = <0>;
 			qcom,usb-bam-fifo-baseaddr = <0x146bb000>;
@@ -2244,7 +2245,8 @@
 		      <0x10ab000 0x1000>;
 		reg-names = "tsens_srot_physical",
 			    "tsens_tm_physical";
-		interrupts = <0 458 0>, <0 445 0>;
+		interrupts = <GIC_SPI 458 IRQ_TYPE_LEVEL_HIGH>, 
+					 <GIC_SPI 445 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "tsens-upper-lower", "tsens-critical";
 		#thermal-sensor-cells = <1>;
 	};
@@ -2255,7 +2257,8 @@
 		      <0x10ae000 0x1000>;
 		reg-names = "tsens_srot_physical",
 			    "tsens_tm_physical";
-		interrupts = <0 184 0>, <0 430 0>;
+		interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>, 
+					 <GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "tsens-upper-lower", "tsens-critical";
 		#thermal-sensor-cells = <1>;
 	};
@@ -2419,44 +2422,44 @@
 				36 37>;
 		#interrupt-cells = <1>;
 		interrupt-map-mask = <0 0 0 0xffffffff>;
-		interrupt-map = <0 0 0 0 &intc 0 0 405 0
-				0 0 0 1 &intc 0 0 135 0
-				0 0 0 2 &intc 0 0 136 0
-				0 0 0 3 &intc 0 0 138 0
-				0 0 0 4 &intc 0 0 139 0
-				0 0 0 5 &intc 0 0 278 0
-				0 0 0 6 &intc 0 0 576 0
-				0 0 0 7 &intc 0 0 577 0
-				0 0 0 8 &intc 0 0 578 0
-				0 0 0 9 &intc 0 0 579 0
-				0 0 0 10 &intc 0 0 580 0
-				0 0 0 11 &intc 0 0 581 0
-				0 0 0 12 &intc 0 0 582 0
-				0 0 0 13 &intc 0 0 583 0
-				0 0 0 14 &intc 0 0 584 0
-				0 0 0 15 &intc 0 0 585 0
-				0 0 0 16 &intc 0 0 586 0
-				0 0 0 17 &intc 0 0 587 0
-				0 0 0 18 &intc 0 0 588 0
-				0 0 0 19 &intc 0 0 589 0
-				0 0 0 20 &intc 0 0 590 0
-				0 0 0 21 &intc 0 0 591 0
-				0 0 0 22 &intc 0 0 592 0
-				0 0 0 23 &intc 0 0 593 0
-				0 0 0 24 &intc 0 0 594 0
-				0 0 0 25 &intc 0 0 595 0
-				0 0 0 26 &intc 0 0 596 0
-				0 0 0 27 &intc 0 0 597 0
-				0 0 0 28 &intc 0 0 598 0
-				0 0 0 29 &intc 0 0 599 0
-				0 0 0 30 &intc 0 0 600 0
-				0 0 0 31 &intc 0 0 601 0
-				0 0 0 32 &intc 0 0 602 0
-				0 0 0 33 &intc 0 0 603 0
-				0 0 0 34 &intc 0 0 604 0
-				0 0 0 35 &intc 0 0 605 0
-				0 0 0 36 &intc 0 0 606 0
-				0 0 0 37 &intc 0 0 607 0>;
+		interrupt-map = <0 0 0 0 &wakegic 0 0 405 0
+				0 0 0 1 &wakegic 0 0 135 0
+				0 0 0 2 &wakegic 0 0 136 0
+				0 0 0 3 &wakegic 0 0 138 0
+				0 0 0 4 &wakegic 0 0 139 0
+				0 0 0 5 &wakegic 0 0 278 0
+				0 0 0 6 &wakegic 0 0 576 0
+				0 0 0 7 &wakegic 0 0 577 0
+				0 0 0 8 &wakegic 0 0 578 0
+				0 0 0 9 &wakegic 0 0 579 0
+				0 0 0 10 &wakegic 0 0 580 0
+				0 0 0 11 &wakegic 0 0 581 0
+				0 0 0 12 &wakegic 0 0 582 0
+				0 0 0 13 &wakegic 0 0 583 0
+				0 0 0 14 &wakegic 0 0 584 0
+				0 0 0 15 &wakegic 0 0 585 0
+				0 0 0 16 &wakegic 0 0 586 0
+				0 0 0 17 &wakegic 0 0 587 0
+				0 0 0 18 &wakegic 0 0 588 0
+				0 0 0 19 &wakegic 0 0 589 0
+				0 0 0 20 &wakegic 0 0 590 0
+				0 0 0 21 &wakegic 0 0 591 0
+				0 0 0 22 &wakegic 0 0 592 0
+				0 0 0 23 &wakegic 0 0 593 0
+				0 0 0 24 &wakegic 0 0 594 0
+				0 0 0 25 &wakegic 0 0 595 0
+				0 0 0 26 &wakegic 0 0 596 0
+				0 0 0 27 &wakegic 0 0 597 0
+				0 0 0 28 &wakegic 0 0 598 0
+				0 0 0 29 &wakegic 0 0 599 0
+				0 0 0 30 &wakegic 0 0 600 0
+				0 0 0 31 &wakegic 0 0 601 0
+				0 0 0 32 &wakegic 0 0 602 0
+				0 0 0 33 &wakegic 0 0 603 0
+				0 0 0 34 &wakegic 0 0 604 0
+				0 0 0 35 &wakegic 0 0 605 0
+				0 0 0 36 &wakegic 0 0 606 0
+				0 0 0 37 &wakegic 0 0 607 0>;
 
 		interrupt-names = "int_msi", "int_a", "int_b", "int_c",
 				"int_d", "int_global_int",
@@ -2949,18 +2952,19 @@
 		iommus = <&anoc2_smmu 0x1900>,
 			 <&anoc2_smmu 0x1901>;
 		qcom,smmu-s1-bypass;
-		interrupts = <0 413 0 /* CE0 */ >,
-			     <0 414 0 /* CE1 */ >,
-			     <0 415 0 /* CE2 */ >,
-			     <0 416 0 /* CE3 */ >,
-			     <0 417 0 /* CE4 */ >,
-			     <0 418 0 /* CE5 */ >,
-			     <0 420 0 /* CE6 */ >,
-			     <0 421 0 /* CE7 */ >,
-			     <0 422 0 /* CE8 */ >,
-			     <0 423 0 /* CE9 */ >,
-			     <0 424 0 /* CE10 */ >,
-			     <0 425 0 /* CE11 */ >;
+		interrupts = 
+				<GIC_SPI 413 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 414 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 415 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 416 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 417 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 418 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 421 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 423 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 424 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 425 IRQ_TYPE_LEVEL_HIGH>;		
 		qcom,wlan-msa-memory = <0x100000>;
 		vdd-cx-mx-supply = <&pm8998_l5>;
 		vdd-1.8-xo-supply = <&pm8998_l7_pin_ctrl>;
