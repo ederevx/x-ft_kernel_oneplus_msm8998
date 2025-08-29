@@ -1817,9 +1817,9 @@
 		#size-cells = <1>;
 		ranges;
 
-		interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH>, 
-					 <GIC_SPI 243 IRQ_TYPE_LEVEL_HIGH>,  
-					 <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI 347 IRQ_TYPE_NONE>, 
+					 <GIC_SPI 243 IRQ_TYPE_NONE>,  
+					 <GIC_SPI 180 IRQ_TYPE_NONE>;
 		interrupt-names = "hs_phy_irq", "ss_phy_irq", "pwr_event_irq";
 
 		USB3_GDSC-supply = <&gdsc_usb30>;
