@@ -848,7 +848,8 @@
 		reg = <0x171c0000 0x2C000>,
 			<0x17184000 0x32000>;
 		reg-names = "slimbus_physical", "slimbus_bam_physical";
-		interrupts = <0 163 0>, <0 164 0>;
+		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>, 
+					 <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "slimbus_irq", "slimbus_bam_irq";
 		qcom,apps-ch-pipes = <0x00001f80>;
 		qcom,ea-pc = <0x210>;
@@ -861,7 +862,8 @@
 		reg = <0x17240000 0x2C000>,
 			<0x17204000 0x26000>;
 		reg-names = "slimbus_physical", "slimbus_bam_physical";
-		interrupts = <0 291 0>, <0 292 0>;
+		interrupts = <GIC_SPI 291 IRQ_TYPE_LEVEL_HIGH>, 
+					 <GIC_SPI 292 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "slimbus_irq", "slimbus_bam_irq";
 
 		/* Slimbus Slave DT for WCN3990 */
@@ -883,7 +885,7 @@
 
 		frame@17921000 {
 			frame-number = <0>;
-			interrupts = <0 8 0x4>,
+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
 				     <0 7 0x4>;
 			reg = <0x17921000 0x1000>,
 			      <0x17922000 0x1000>;
@@ -891,42 +893,42 @@
 
 		frame@17923000 {
 			frame-number = <1>;
-			interrupts = <0 9 0x4>;
+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x17923000 0x1000>;
 			status = "disabled";
 		};
 
 		frame@17924000 {
 			frame-number = <2>;
-			interrupts = <0 10 0x4>;
+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x17924000 0x1000>;
 			status = "disabled";
 		};
 
 		frame@17925000 {
 			frame-number = <3>;
-			interrupts = <0 11 0x4>;
+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x17925000 0x1000>;
 			status = "disabled";
 		};
 
 		frame@17926000 {
 			frame-number = <4>;
-			interrupts = <0 12 0x4>;
+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x17926000 0x1000>;
 			status = "disabled";
 		};
 
 		frame@17927000 {
 			frame-number = <5>;
-			interrupts = <0 13 0x4>;
+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x17927000 0x1000>;
 			status = "disabled";
 		};
 
 		frame@17928000 {
 			frame-number = <6>;
-			interrupts = <0 14 0x4>;
+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x17928000 0x1000>;
 			status = "disabled";
 		};
@@ -960,7 +962,7 @@
 		compatible = "qcom,bimc-bwmon3";
 		reg = <0x01008000 0x300>, <0x01001000 0x200>;
 		reg-names = "base", "global_base";
-		interrupts = <0 183 4>;
+		interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>;
 		qcom,mport = <0>;
 		qcom,count-unit = <0x1000>;
 		qcom,mb-shift = <21>;
@@ -1466,7 +1468,7 @@
 		compatible = "qcom,msm-gladiator-v2";
 		reg = <0x17900000 0xe000>;
 		reg-names = "gladiator_base";
-		interrupts = <0 22 0>;
+		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
 		clock-names = "atb_clk";
 		clocks = <&clock_rpmcc RPM_SMD_QDSS_CLK>;
 	};
@@ -2328,7 +2330,7 @@
 		reg = <0x1DE0000 0x20000>,
 		      <0x1DC4000 0x24000>;
 		reg-names = "crypto-base","crypto-bam-base";
-		interrupts = <0 206 0>;
+		interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
 		qcom,bam-pipe-pair = <2>;
 		qcom,ce-hw-instance = <0>;
 		qcom,ce-device = <0>;
@@ -2361,7 +2363,7 @@
 		reg = <0x1DE0000 0x20000>,
 		      <0x1DC4000 0x24000>;
 		reg-names = "crypto-base","crypto-bam-base";
-		interrupts = <0 206 0>;
+		interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
 		qcom,bam-pipe-pair = <1>;
 		qcom,ce-hw-instance = <0>;
 		qcom,ce-device = <0>;
@@ -2702,7 +2704,8 @@
 		compatible = "qcom,msm-watchdog";
 		reg = <0x17817000 0x1000>;
 		reg-names = "wdt-base";
-		interrupts = <0 3 0>, <0 4 0>;
+		interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>, 
+					 <GIC_SPI 4 IRQ_TYPE_EDGE_RISING>;
 		qcom,bark-time = <11000>;
 		qcom,pet-time = <10000>;
 		qcom,ipi-ping;

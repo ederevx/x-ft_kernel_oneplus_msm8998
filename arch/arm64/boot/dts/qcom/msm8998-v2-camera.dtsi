@@ -17,7 +17,7 @@
 		compatible = "qcom,csiphy-v5.01", "qcom,csiphy";
 		reg = <0xca34000 0x1000>;
 		reg-names = "csiphy";
-		interrupts = <0 78 0>;
+		interrupts = <GIC_SPI 78 IRQ_TYPE_EDGE_RISING>;
 		interrupt-names = "csiphy";
 		gdscr-supply = <&gdsc_camss_top>;
 		bimc_smmu-supply = <&gdsc_bimc_smmu>;
@@ -52,7 +52,7 @@
 		compatible = "qcom,csiphy-v5.01", "qcom,csiphy";
 		reg = <0xca35000 0x1000>;
 		reg-names = "csiphy";
-		interrupts = <0 79 0>;
+		interrupts = <GIC_SPI 79 IRQ_TYPE_EDGE_RISING>;
 		interrupt-names = "csiphy";
 		gdscr-supply = <&gdsc_camss_top>;
 		bimc_smmu-supply = <&gdsc_bimc_smmu>;
@@ -87,7 +87,7 @@
 		compatible = "qcom,csiphy-v5.01", "qcom,csiphy";
 		reg = <0xca36000 0x1000>;
 		reg-names = "csiphy";
-		interrupts = <0 80 0>;
+		interrupts = <GIC_SPI 80 IRQ_TYPE_EDGE_RISING>;
 		interrupt-names = "csiphy";
 		gdscr-supply = <&gdsc_camss_top>;
 		bimc_smmu-supply = <&gdsc_bimc_smmu>;
@@ -125,7 +125,7 @@
 			<0xca18000 0x3000>,
 			<0xc8c36d4 0x4>;
 		reg-names = "cpp", "cpp_vbif", "cpp_hw", "camss_cpp";
-		interrupts = <0 294 0>;
+		interrupts = <GIC_SPI 294 IRQ_TYPE_EDGE_RISING>;
 		interrupt-names = "cpp";
 		smmu-vdd-supply = <&gdsc_bimc_smmu>;
 		camss-vdd-supply = <&gdsc_camss_top>;
