@@ -49,16 +49,16 @@
 		qcom,use-psci;
 		#address-cells = <1>;
 		#size-cells = <0>;
+
 		qcom,pm-cluster@0 {
 			reg = <0>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			label = "system";
-			qcom,spm-device-names = "cci";
 			qcom,psci-mode-shift = <8>;
 			qcom,psci-mode-mask = <0xf>;
 
-			qcom,pm-cluster-level@0{
+			qcom,pm-cluster-level@0 {
 				reg = <0>;
 				label = "system-wfi";
 				qcom,psci-mode = <0x0>;
@@ -67,29 +67,28 @@
 				qcom,min-residency-us = <120>;
 			};
 
-			qcom,pm-cluster-level@1{ /* E3 */
+			qcom,pm-cluster-level@1 { /* E3 */
 				reg = <1>;
 				label = "system-pc";
 				qcom,psci-mode = <0x3>;
 				qcom,entry-latency-us = <11210>;
 				qcom,exit-latency-us = <5534>;
 				qcom,min-residency-us = <16745>;
-				qcom,min-child-idx = <3>;
+				qcom,min-child-idx = <1>;
 				qcom,is-reset;
 				qcom,notify-rpm;
 			};
 
-			qcom,pm-cluster@0{
+			qcom,pm-cluster@0 {
 				reg = <0>;
 				#address-cells = <1>;
 				#size-cells = <0>;
-				label = "pwr";
-				qcom,spm-device-names = "l2";
+				label = "l2-pwr";
 				qcom,cpu = <&CPU0 &CPU1 &CPU2 &CPU3>;
 				qcom,psci-mode-shift = <4>;
 				qcom,psci-mode-mask = <0xf>;
 
-				qcom,pm-cluster-level@0{ /* D1 */
+				qcom,pm-cluster-level@0 { /* D1 */
 					reg = <0>;
 					label = "pwr-l2-wfi";
 					qcom,psci-mode = <0x1>;
@@ -98,28 +97,8 @@
 					qcom,min-residency-us = <99>;
 				};
 
-				qcom,pm-cluster-level@1{ /* D2D */
+				qcom,pm-cluster-level@1 { /* D4 */
 					reg = <1>;
-					label = "pwr-l2-dynret";
-					qcom,psci-mode = <0x2>;
-					qcom,entry-latency-us = <317>;
-					qcom,exit-latency-us = <659>;
-					qcom,min-residency-us = <977>;
-					qcom,min-child-idx = <1>;
-				};
-
-				qcom,pm-cluster-level@2{ /* D2E */
-					reg = <2>;
-					label = "pwr-l2-ret";
-					qcom,psci-mode = <0x3>;
-					qcom,entry-latency-us = <569>;
-					qcom,exit-latency-us = <743>;
-					qcom,min-residency-us = <3356>;
-					qcom,min-child-idx = <2>;
-				};
-
-				qcom,pm-cluster-level@3{ /* D4 */
-					reg = <3>;
 					label = "pwr-l2-pc";
 					qcom,psci-mode = <0x4>;
 					qcom,entry-latency-us = <814>;
@@ -139,7 +118,6 @@
 					qcom,pm-cpu-level@0 { /* C1 */
 						reg = <0>;
 						label = "wfi";
-						qcom,spm-cpu-mode = "wfi";
 						qcom,psci-cpu-mode = <0x1>;
 						qcom,entry-latency-us = <40>;
 						qcom,exit-latency-us = <43>;
@@ -150,7 +128,6 @@
 						reg = <1>;
 						label = "ret";
 						qcom,psci-cpu-mode = <2>;
-						qcom,spm-cpu-mode = "ret";
 						qcom,entry-latency-us = <81>;
 						qcom,exit-latency-us = <86>;
 						qcom,min-residency-us = <504>;
@@ -159,7 +136,6 @@
 					qcom,pm-cpu-level@2 {  /* C3 */
 						reg = <2>;
 						label = "pc";
-						qcom,spm-cpu-mode = "pc";
 						qcom,psci-cpu-mode = <0x3>;
 						qcom,entry-latency-us = <273>;
 						qcom,exit-latency-us = <612>;
@@ -170,17 +146,16 @@
 				};
 			};
 
-			qcom,pm-cluster@1{
+			qcom,pm-cluster@1 {
 				reg = <1>;
 				#address-cells = <1>;
 				#size-cells = <0>;
-				label = "perf";
-				qcom,spm-device-names = "l2";
+				label = "l2-perf";
 				qcom,cpu = <&CPU4 &CPU5 &CPU6 &CPU7>;
 				qcom,psci-mode-shift = <4>;
 				qcom,psci-mode-mask = <0xf>;
 
-				qcom,pm-cluster-level@0{  /* D1 */
+				qcom,pm-cluster-level@0 {  /* D1 */
 					reg = <0>;
 					label = "perf-l2-wfi";
 					qcom,psci-mode = <0x1>;
@@ -189,28 +164,8 @@
 					qcom,min-residency-us = <99>;
 				};
 
-				qcom,pm-cluster-level@1{ /* D2D */
+				qcom,pm-cluster-level@1 { /* D4 */
 					reg = <1>;
-					label = "perf-l2-dynret";
-					qcom,psci-mode = <2>;
-					qcom,entry-latency-us = <342>;
-					qcom,exit-latency-us = <529>;
-					qcom,min-residency-us = <906>;
-					qcom,min-child-idx = <1>;
-				};
-
-				qcom,pm-cluster-level@2{ /* D2E */
-					reg = <2>;
-					label = "perf-l2-ret";
-					qcom,psci-mode = <3>;
-					qcom,entry-latency-us = <420>;
-					qcom,exit-latency-us = <605>;
-					qcom,min-residency-us = <3381>;
-					qcom,min-child-idx = <2>;
-				};
-
-				qcom,pm-cluster-level@3{ /* D4 */
-					reg = <3>;
 					label = "perf-l2-pc";
 					qcom,psci-mode = <0x4>;
 					qcom,entry-latency-us = <724>;
@@ -230,7 +185,6 @@
 					qcom,pm-cpu-level@0 { /* C1 */
 						reg = <0>;
 						label = "wfi";
-						qcom,spm-cpu-mode = "wfi";
 						qcom,psci-cpu-mode = <0x1>;
 						qcom,entry-latency-us = <43>;
 						qcom,exit-latency-us = <43>;
@@ -241,15 +195,14 @@
 						reg = <1>;
 						label = "ret";
 						qcom,psci-cpu-mode = <2>;
-						qcom,spm-cpu-mode = "ret";
 						qcom,entry-latency-us = <79>;
 						qcom,exit-latency-us = <82>;
 						qcom,min-residency-us = <1302>;
 					};
+
 					qcom,pm-cpu-level@2 { /* C3 */
 						reg = <2>;
 						label = "pc";
-						qcom,spm-cpu-mode = "pc";
 						qcom,psci-cpu-mode = <0x3>;
 						qcom,entry-latency-us = <336>;
 						qcom,exit-latency-us = <525>;
