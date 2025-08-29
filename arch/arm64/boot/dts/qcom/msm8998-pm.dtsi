@@ -57,6 +57,7 @@
 			label = "system";
 			qcom,psci-mode-shift = <8>;
 			qcom,psci-mode-mask = <0xf>;
+			qcom,disable-prediction;
 
 			qcom,pm-cluster-level@0 {
 				reg = <0>;
@@ -87,6 +88,7 @@
 				qcom,cpu = <&CPU0 &CPU1 &CPU2 &CPU3>;
 				qcom,psci-mode-shift = <4>;
 				qcom,psci-mode-mask = <0xf>;
+				qcom,clstr-tmr-add = <1000>;
 
 				qcom,pm-cluster-level@0 { /* D1 */
 					reg = <0>;
@@ -114,6 +116,9 @@
 					qcom,psci-mode-shift = <0>;
 					qcom,psci-mode-mask = <0xf>;
 					qcom,cpu = <&CPU0 &CPU1 &CPU2 &CPU3>;
+					qcom,ref-stddev = <500>;
+					qcom,tmr-add = <1000>;
+					qcom,ref-premature-cnt = <1>;
 
 					qcom,pm-cpu-level@0 { /* C1 */
 						reg = <0>;
@@ -154,6 +159,7 @@
 				qcom,cpu = <&CPU4 &CPU5 &CPU6 &CPU7>;
 				qcom,psci-mode-shift = <4>;
 				qcom,psci-mode-mask = <0xf>;
+				qcom,clstr-tmr-add = <1000>;
 
 				qcom,pm-cluster-level@0 {  /* D1 */
 					reg = <0>;
