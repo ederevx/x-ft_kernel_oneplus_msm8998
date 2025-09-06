@@ -748,6 +748,10 @@ static DEFINE_CLK_VOTER(cnoc_periph_keepalive_a_clk, cnoc_periph_a_clk,
 							LONG_MAX);
 static DEFINE_CLK_VOTER(pnoc_pm_clk, pnoc_clk, LONG_MAX);
 static DEFINE_CLK_VOTER(pnoc_sps_clk, pnoc_clk, 0);
+static DEFINE_CLK_VOTER(aggre1_noc_msmbus_clk, aggre1_noc_clk, LONG_MAX);
+static DEFINE_CLK_VOTER(aggre1_noc_msmbus_a_clk, aggre1_noc_a_clk, LONG_MAX);
+static DEFINE_CLK_VOTER(aggre1_noc_usb_clk, aggre1_noc_clk, 19200000);
+static DEFINE_CLK_VOTER(aggre1_noc_smmu_clk, aggre1_noc_clk, 1000);
 static DEFINE_CLK_VOTER(aggre2_noc_msmbus_clk, aggre2_noc_clk, LONG_MAX);
 static DEFINE_CLK_VOTER(aggre2_noc_msmbus_a_clk, aggre2_noc_a_clk, LONG_MAX);
 static DEFINE_CLK_VOTER(aggre2_noc_usb_clk, aggre2_noc_clk, 19200000);
@@ -928,6 +932,14 @@ static struct clk_hw *msm8998_clks[] = {
 	[RPM_SMD_DIV_CLK3_AO]	= &msm8998_div_clk3_ao.hw,
 	[MMSSNOC_AXI_CLK]	= &mmssnoc_axi_clk.hw,
 	[MMSSNOC_AXI_A_CLK]	= &mmssnoc_axi_a_clk.hw,
+	[AGGR1_NOC_MSMBUS_CLK]	= &aggre1_noc_msmbus_clk.hw,
+	[AGGR1_NOC_MSMBUS_A_CLK] = &aggre1_noc_msmbus_a_clk.hw,
+	[AGGR1_NOC_SMMU_CLK]	= &aggre1_noc_smmu_clk.hw,
+	[AGGR1_NOC_USB_CLK]	= &aggre1_noc_usb_clk.hw,
+	[AGGR2_NOC_MSMBUS_CLK]	= &aggre2_noc_msmbus_clk.hw,
+	[AGGR2_NOC_MSMBUS_A_CLK] = &aggre2_noc_msmbus_a_clk.hw,
+	[AGGR2_NOC_SMMU_CLK]	= &aggre2_noc_smmu_clk.hw,
+	[AGGR2_NOC_USB_CLK]	= &aggre2_noc_usb_clk.hw,
 	[BIMC_MSMBUS_CLK]	= &bimc_msmbus_clk.hw,
 	[BIMC_MSMBUS_A_CLK]	= &bimc_msmbus_a_clk.hw,
 	[CNOC_MSMBUS_CLK]	= &cnoc_msmbus_clk.hw,
