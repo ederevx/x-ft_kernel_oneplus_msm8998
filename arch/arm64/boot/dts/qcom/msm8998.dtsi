@@ -1842,12 +1842,13 @@
 		clocks = <&clock_gcc GCC_USB30_MASTER_CLK>,
 			<&clock_gcc GCC_CFG_NOC_USB3_AXI_CLK>,
 			<&clock_gcc GCC_AGGRE1_USB3_AXI_CLK>,
+			<&clock_rpmcc AGGR1_NOC_USB_CLK>,
 			<&clock_gcc GCC_USB30_MOCK_UTMI_CLK>,
 			<&clock_gcc GCC_USB30_SLEEP_CLK>,
 			<&clock_rpmcc CXO_SMD_DWC3_CLK>;
 
 		clock-names = "core_clk", "iface_clk", "bus_aggr_clk",
-				"utmi_clk", "sleep_clk", "xo";
+				"noc_aggr_clk", "utmi_clk", "sleep_clk", "xo";
 
 		qcom,core-clk-rate = <120000000>;
 		qcom,core-clk-rate-hs = <60000000>;
@@ -2630,7 +2631,7 @@
 		qcom,mas-crypto = <&mas_crypto_c0>;
 
 		clocks = <&clock_rpmcc CXO_SMD_PIL_SSC_CLK>,
-			 <&clock_rpmcc RPM_SMD_AGGR2_NOC_CLK>;
+			 <&clock_rpmcc AGGR2_NOC_SMMU_CLK>;
 		clock-names = "xo", "aggre2";
 		qcom,proxy-clock-names = "xo", "aggre2";
 
