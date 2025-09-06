@@ -39,8 +39,8 @@
 			qcom,qos-off = <4096>;
 			qcom,base-offset = <36864>;
 			clock-names = "bus_clk", "bus_a_clk";
-			clocks = <&clock_rpmcc RPM_SMD_AGGR1_NOC_CLK>,
-				<&clock_rpmcc RPM_SMD_AGGR1_NOC_A_CLK>;
+			clocks = <&clock_rpmcc AGGR1_NOC_MSMBUS_CLK>,
+				<&clock_rpmcc AGGR1_NOC_MSMBUS_A_CLK>;
 			qcom,node-qos-clks {
 				clock-names =
 				"clk-ufs-axi-clk",
@@ -64,8 +64,8 @@
 			qcom,qos-off = <4096>;
 			qcom,base-offset = <20480>;
 			clock-names = "bus_clk", "bus_a_clk";
-			clocks = <&clock_rpmcc RPM_SMD_AGGR2_NOC_CLK>,
-				<&clock_rpmcc RPM_SMD_AGGR2_NOC_A_CLK>;
+			clocks = <&clock_rpmcc AGGR2_NOC_MSMBUS_CLK>,
+				<&clock_rpmcc AGGR2_NOC_MSMBUS_A_CLK>;
 			qcom,node-qos-clks {
 				clock-names =
 				"clk-ipa-clk",
@@ -108,7 +108,6 @@
 			label = "fab-cr_virt";
 			qcom,virt-dev;
 			qcom,base-name = "cr_virt-base";
-			qcom,bypass-qos-prg;
 		};
 
 		fab_gnoc: fab-gnoc {
@@ -116,7 +115,6 @@
 			label = "fab-gnoc";
 			qcom,virt-dev;
 			qcom,base-name = "gnoc-base";
-			qcom,bypass-qos-prg;
 		};
 
 		fab_mnoc: fab-mnoc {
@@ -131,29 +129,14 @@
 			clock-names = "bus_clk", "bus_a_clk";
 			clocks = <&clock_rpmcc MMSSNOC_AXI_CLK>,
 				<&clock_rpmcc MMSSNOC_AXI_A_CLK>;
-			clk-camss-ahb-no-rate-supply =
-					<&gdsc_camss_top>;
-			clk-video-ahb-no-rate-supply =
-					<&gdsc_venus>;
-			clk-video-axi-no-rate-supply =
-					<&gdsc_venus>;
 			qcom,node-qos-clks {
 				clock-names =
-				"clk-noc-cfg-ahb-no-rate",
-				"clk-mmss-noc-cfg-ahb-no-rate",
-				"clk-mnoc-ahb-no-rate",
-				"clk-camss-ahb-no-rate",
-				"clk-video-ahb-no-rate",
-				"clk-video-axi-no-rate";
+				"clk-mmssnoc-axi-no-rate",
+				"clk-mmss-noc-cfg-ahb-no-rate";
 				clocks =
 				<&clock_rpmcc MMSSNOC_AXI_CLK>,
-				<&clock_gcc GCC_MMSS_NOC_CFG_AHB_CLK>,
-				<&clock_mmss MMSS_MNOC_AHB_CLK>,
-				<&clock_mmss MMSS_CAMSS_AHB_CLK>,
-				<&clock_mmss MMSS_VIDEO_AHB_CLK>,
-				<&clock_mmss MMSS_VIDEO_AXI_CLK>;
+				<&clock_gcc GCC_MMSS_NOC_CFG_AHB_CLK>;
 			};
-
 		};
 
 		fab_snoc: fab-snoc {
@@ -174,7 +157,6 @@
 			label = "fab-mnoc-ahb";
 			qcom,fab-dev;
 			qcom,base-name = "mmnoc-ahb-base";
-			qcom,bypass-qos-prg;
 			qcom,setrate-only-clk;
 			qcom,bus-type = <1>;
 			clock-names = "bus_clk", "bus_a_clk";
@@ -528,19 +510,6 @@
 			qcom,bus-dev = <&fab_mnoc>;
 			qcom,vrail-comp = <25>;
 			qcom,mas-rpm-id = <ICBID_MASTER_MDP0>;
-			clk-mdss-axi-no-rate-supply =
-					<&gdsc_mdss>;
-			clk-mdss-ahb-no-rate-supply =
-					<&gdsc_mdss>;
-			qcom,node-qos-clks {
-				clock-names =
-				"clk-mdss-ahb-no-rate",
-				"clk-mdss-axi-no-rate";
-				clocks =
-				<&clock_mmss MMSS_MDSS_AHB_CLK>,
-				<&clock_mmss MMSS_MDSS_AXI_CLK>;
-			};
-
 		};
 
 		mas_mdp_p1: mas-mdp-p1 {
