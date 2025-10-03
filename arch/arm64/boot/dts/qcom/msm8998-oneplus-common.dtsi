@@ -720,6 +720,16 @@
 		};
 	};
 
+	/* Reconfigure GPU throttling to trigger at 85C */
+	gpu-virt-max-step {
+		trips {
+			gpu-trip0 {
+				temperature = <85000>;
+				hysteresis = <0>;
+			};
+		};
+	};
+
 	/* Configure BCL SOC threshold */
 	soc {
 		trips {
