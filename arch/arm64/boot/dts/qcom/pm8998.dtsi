@@ -166,18 +166,6 @@
 			#size-cells = <0>;
 			#thermal-sensor-cells = <1>;
 		};
-
-		pm8998_clkdiv: clock-controller@5b00 {
-			compatible = "qcom,spmi-clkdiv";
-			reg = <0x5b00 0x300>;
-			#clock-cells = <1>;
-			qcom,num-clkdivs = <3>;
-			clock-output-names = "pm8998_div_clk1",
-						"pm8998_div_clk2",
-						"pm8998_div_clk3";
-			clocks = <&clock_rpmcc RPM_SMD_XO_CLK_SRC>;
-			clock-names = "xo";
-		};
 	};
 
 	qcom,pm8998@1 {
