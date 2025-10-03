@@ -750,17 +750,32 @@
 
 &thermal_zones {
 	ibat-high {
-		polling-delay-passive = <0>;
+		polling-delay-passive = <100>;
 		polling-delay = <0>;
 		thermal-governor = "step_wise";
 		thermal-sensors = <&bcl_sensor 0>;
 		wake-capable-sensor;
 
 		trips {
-			ibat_high: low-ibat {
-				temperature = <5000>;
-				hysteresis = <200>;
+			pmi8998_ibat_high: ibat-high {
+				temperature = <4200>;
+				hysteresis = <800>;
 				type = "passive";
+			};
+		};
+
+		cooling-maps {
+			ibat_map6 {
+				trip = <&pmi8998_ibat_high>;
+				cooling-device =
+					<&CPU6 THERMAL_MAX_LIMIT
+						THERMAL_MAX_LIMIT>;
+			};
+			ibat_map7 {
+				trip = <&pmi8998_ibat_high>;
+				cooling-device =
+					<&CPU7 THERMAL_MAX_LIMIT
+						THERMAL_MAX_LIMIT>;
 			};
 		};
 	};
@@ -773,15 +788,15 @@
 		wake-capable-sensor;
 
 		trips {
-			ibat_vhigh: ibat_vhigh {
-				temperature = <6000>;
+			pmi8998_ibat_vhigh: ibat-vhigh {
+				temperature = <4300>;
 				hysteresis = <100>;
 				type = "passive";
 			};
 		};
 	};
 
-	vbat {
+	vbat_adc {
 		polling-delay-passive = <100>;
 		polling-delay = <0>;
 		thermal-governor = "low_limits_cap";
@@ -790,34 +805,34 @@
 		tracks-low;
 
 		trips {
-			low_vbat: low-vbat {
-				temperature = <3200>;
-				hysteresis = <100>;
+			pmi8998_vbat_adc: vbat-adc {
+				temperature = <3300>;
+				hysteresis = <200>;
 				type = "passive";
 			};
 		};
 
 		cooling-maps {
 			vbat_cpu4 {
-				trip = <&low_vbat>;
+				trip = <&pmi8998_vbat_adc>;
 				cooling-device =
 					<&CPU4 THERMAL_MAX_LIMIT
 						THERMAL_MAX_LIMIT>;
 			};
 			vbat_cpu5 {
-				trip = <&low_vbat>;
+				trip = <&pmi8998_vbat_adc>;
 				cooling-device =
 					<&CPU5 THERMAL_MAX_LIMIT
 						THERMAL_MAX_LIMIT>;
 			};
 			vbat_map6 {
-				trip = <&low_vbat>;
+				trip = <&pmi8998_vbat_adc>;
 				cooling-device =
 					<&CPU6 THERMAL_MAX_LIMIT
 						THERMAL_MAX_LIMIT>;
 			};
 			vbat_map7 {
-				trip = <&low_vbat>;
+				trip = <&pmi8998_vbat_adc>;
 				cooling-device =
 					<&CPU7 THERMAL_MAX_LIMIT
 						THERMAL_MAX_LIMIT>;
@@ -834,8 +849,8 @@
 		tracks-low;
 
 		trips {
-			low-vbat {
-				temperature = <2800>;
+			pmi8998_vbat_low: vbat-low {
+				temperature = <3100>;
 				hysteresis = <0>;
 				type = "passive";
 			};
@@ -851,8 +866,8 @@
 		tracks-low;
 
 		trips {
-			low-vbat {
-				temperature = <2600>;
+			pmi8998_vbat_too_low: vbat-too-low {
+				temperature = <2900>;
 				hysteresis = <0>;
 				type = "passive";
 			};
