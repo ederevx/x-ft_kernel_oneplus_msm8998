@@ -4105,24 +4105,20 @@ static int derive_device_list(struct device **device_list,
 	return 0;
 }
 
-static int clk_get_voltage(struct clk_core *core, unsigned long rate, int n)
+static int clk_get_voltage(struct clk_core *core, unsigned long rate)
 {
 	struct clk_vdd_class *vdd;
 	int level, corner;
 
-	/* Use the first regulator in the vdd class for the OPP table. */
-	vdd = core->vdd_class;
-	if (vdd->num_regulators > 1) {
-		corner = vdd->vdd_uv[vdd->num_regulators * n];
-	} else {
-		level = clk_find_vdd_level(core, rate);
-		if (level < 0) {
-			pr_err("Could not find vdd level\n");
-			return -EINVAL;
-		}
-		corner = vdd->vdd_uv[level];
+	level = clk_find_vdd_level(core, rate);
+	if (level < 0) {
+		pr_err("Could not find vdd level\n");
+		return -EINVAL;
 	}
 
+	/* Use the first regulator in the vdd class for the OPP table. */
+	vdd = core->vdd_class;
+	corner = vdd->vdd_uv[vdd->num_regulators * level];
 	if (!corner) {
 		pr_err("%s: Unable to find vdd level for rate %lu\n",
 					core->name, rate);
@@ -4219,7 +4215,7 @@ static void clk_populate_clock_opp_table(struct device_node *np,
 			break;
 		rate = rrate;
 
-		uv = clk_get_voltage(core, rate, n);
+		uv = clk_get_voltage(core, rate);
 		if (uv < 0)
 			goto err_derive_device_list;
 
