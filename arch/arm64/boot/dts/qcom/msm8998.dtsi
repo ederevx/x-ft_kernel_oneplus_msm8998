@@ -1160,6 +1160,7 @@
 		compatible = "qcom,gpucc-msm8998";
 		reg = <0x5065000 0x9000>;
 		vdd_gpucc-supply = <&gfx_vreg>;
+		vdd_mx-supply = <&pm8998_s9_level>;
 		qcom,gfx3d_clk_src-opp-handle = <&msm_gpu>;
 		#clock-cells = <1>;
 	};

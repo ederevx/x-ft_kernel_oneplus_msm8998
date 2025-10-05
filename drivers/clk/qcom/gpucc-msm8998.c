@@ -51,19 +51,19 @@
 #define F_GFX(f, s, h, m, n, sf) { (f), (s), (2 * (h) - 1), (m), (n), (sf) }
 
 static int vdd_gpucc_corner[] = {
-	VDD_GFX_NONE,		/* OFF			*/
-	VDD_GFX_MIN_SVS,	/* MIN:  MinSVS		*/
-	VDD_GFX_LOW_SVS,	/* LOW:  LowSVS		*/
-	VDD_GFX_SVS_MINUS,	/* LOW:  SVS-		*/
-	VDD_GFX_SVS,		/* LOW:  SVS		*/
-	VDD_GFX_SVS_PLUS,	/* LOW:  SVS+		*/
-	VDD_GFX_NOMINAL,	/*       NOMINAL	*/
-	VDD_GFX_TURBO,		/* HIGH: TURBO		*/
-	VDD_GFX_TURBO_L1,	/* HIGH: TURBO_L1	*/
+	VDD_GFX_NONE,		RPM_REGULATOR_LEVEL_NONE,	/* OFF			*/
+	VDD_GFX_MIN_SVS,	RPM_REGULATOR_LEVEL_SVS,	/* MIN:  MinSVS		*/
+	VDD_GFX_LOW_SVS,	RPM_REGULATOR_LEVEL_SVS,	/* LOW:  LowSVS		*/
+	VDD_GFX_SVS_MINUS,	RPM_REGULATOR_LEVEL_SVS,	/* LOW:  SVS-		*/
+	VDD_GFX_SVS,		RPM_REGULATOR_LEVEL_SVS,	/* LOW:  SVS		*/
+	VDD_GFX_SVS_PLUS,	RPM_REGULATOR_LEVEL_NOM,	/* LOW:  SVS+		*/
+	VDD_GFX_NOMINAL,	RPM_REGULATOR_LEVEL_NOM,	/*       NOMINAL	*/
+	VDD_GFX_TURBO,		RPM_REGULATOR_LEVEL_TURBO,	/* HIGH: TURBO		*/
+	VDD_GFX_TURBO_L1,	RPM_REGULATOR_LEVEL_TURBO,	/* HIGH: TURBO_L1	*/
 };
 
 static DEFINE_VDD_REGULATORS(vdd_dig, VDD_DIG_NUM, 1, vdd_corner);
-static DEFINE_VDD_REGULATORS(vdd_gpucc, VDD_GFX_MAX, 1, vdd_gpucc_corner);
+static DEFINE_VDD_REGULATORS(vdd_gpucc, VDD_GFX_MAX, 2, vdd_gpucc_corner);
 static DEFINE_VDD_REGULATORS(vdd_gpucc_mx, VDD_MX_NUM, 1, vdd_corner);
 
 enum {
@@ -412,6 +412,14 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev,
 				"Unable to get vdd_gpucc regulator\n");
 		return PTR_ERR(vdd_gpucc.regulator[0]);
+	}
+
+	vdd_gpucc.regulator[1] = devm_regulator_get(&pdev->dev, "vdd_mx");
+	if (IS_ERR(vdd_gpucc.regulator[1])) {
+		if (PTR_ERR(vdd_gpucc.regulator[1]) != -EPROBE_DEFER)
+			dev_err(&pdev->dev,
+				"Unable to get vdd_mx regulator\n");
+		return PTR_ERR(vdd_gpucc.regulator[1]);
 	}
 
 	/* Clear the DBG_CLK_DIV bits of the GPU debug register */
