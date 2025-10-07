@@ -42,6 +42,8 @@
 #include "reset.h"
 #include "vdd-level-8998.h"
 
+#define GPUCC_GPU_DD_WRAP_CTRL		0x430
+
 #define CRC_SID_FSM_OFFSET			0x10A0
 #define CRC_MND_CFG_OFFSET			0x10A4
 
@@ -417,11 +419,8 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 
 	clk_fabia_pll_configure(&gpu_pll0_pll, regmap, &gpu_pll0_config);
 
-	/* Force periph logic on to avoid perf counter corruption */
-	regmap_write_bits(regmap, gpucc_gfx3d_clk.clkr.enable_reg, BIT(13), BIT(13));
-
 	/* Tweak droop detector (GPUCC_GPU_DD_WRAP_CTRL) to reduce leakage */
-	regmap_write_bits(regmap, 0x430, BIT(0), BIT(0));
+	regmap_write_bits(regmap, GPUCC_GPU_DD_WRAP_CTRL, BIT(0), BIT(0));
 
 	/* Enable GFX CRC by enabling MND RC in Bypass mode */
 	regmap_write_bits(regmap, CRC_MND_CFG_OFFSET, 0x00015010, 0x00015010);
