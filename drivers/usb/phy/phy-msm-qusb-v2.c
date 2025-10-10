@@ -113,6 +113,7 @@ struct qusb_phy {
 	int			tune2_efuse_correction;
 
 	bool			power_enabled_ref;
+	bool			clocks_enabled;
 	bool			cable_connected;
 	bool			suspended;
 	bool			is_se_clk;
@@ -136,16 +137,19 @@ static void qusb_phy_enable_clocks(struct qusb_phy *qphy, bool on)
 {
 	dev_dbg(qphy->phy.dev, "%s(): on:%d\n", __func__, on);
 
-	if (on) {
+	if (!qphy->clocks_enabled && on) {
 		clk_prepare_enable(qphy->ref_clk_src);
 		clk_prepare_enable(qphy->ref_clk);
 		clk_prepare_enable(qphy->cfg_ahb_clk);
-	} else {
+		qphy->clocks_enabled = true;
+	}
+
+	if (qphy->clocks_enabled && !on) {
 		clk_disable_unprepare(qphy->cfg_ahb_clk);
 		clk_disable_unprepare(qphy->ref_clk);
 		clk_disable_unprepare(qphy->ref_clk_src);
+		qphy->clocks_enabled = false;
 	}
-
 }
 
 static int qusb_phy_config_vdd(struct qusb_phy *qphy, int high)
