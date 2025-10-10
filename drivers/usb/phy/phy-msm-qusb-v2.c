@@ -438,6 +438,8 @@ static int qusb_phy_init(struct usb_phy *phy)
 		wmb();
 	}
 
+	qusb_phy_enable_clocks(qphy, true);
+
 	/* Perform phy reset */
 	ret = reset_control_assert(qphy->phy_reset);
 	if (ret)
