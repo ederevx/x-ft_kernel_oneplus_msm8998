@@ -649,11 +649,11 @@ static int qusb_phy_set_suspend(struct usb_phy *phy, int suspend)
 
 			if (linestate & (LINESTATE_DP | LINESTATE_DM)) {
 				/* enable phy auto-resume */
-				writel_relaxed(0x0C,
+				writel_relaxed(0x91,
 					qphy->base + QUSB2PHY_PORT_TEST_CTRL);
 				/* flush the previous write before next write */
 				wmb();
-				writel_relaxed(0x04,
+				writel_relaxed(0x90,
 					qphy->base + QUSB2PHY_PORT_TEST_CTRL);
 			}
 
@@ -696,7 +696,7 @@ static int qusb_phy_set_suspend(struct usb_phy *phy, int suspend)
 		}
 		qphy->suspended = true;
 	} else {
-		/* Bus suspend case */
+		/* Bus resume case */
 		if (qphy->cable_connected ||
 			(qphy->phy.flags & PHY_HOST_MODE)) {
 			qusb_phy_enable_clocks(qphy, true);
