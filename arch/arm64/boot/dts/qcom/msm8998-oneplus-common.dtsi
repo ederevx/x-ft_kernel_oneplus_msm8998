@@ -62,6 +62,15 @@
     reg = <0 0x8b200000 0 0x1e00000>;
 };
 
+/* Memory */
+&mincpu0bw {
+	governor = "compute";
+};
+
+&mincpu4bw {
+	governor = "compute";
+};
+
 /* I/O */
 &soc {
 	gpio_keys {
