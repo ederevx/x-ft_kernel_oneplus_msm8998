@@ -120,6 +120,7 @@ static struct clk_alpha_pll gpu_pll0_pll = {
 	.offset = 0x0,
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
 	.config = &gpu_pll0_config,
+	.flags = SYNC_CAL_L_VAL,
 	.clkr.hw.init = &(struct clk_init_data) {
 		.name = "gpu_cc_pll0",
 		.parent_names = (const char *[]){ "gpucc_xo" },
