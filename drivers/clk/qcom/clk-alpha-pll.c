@@ -1168,7 +1168,10 @@ void clk_fabia_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 	if (config->l)
 		regmap_write(regmap, PLL_L_VAL(pll), config->l);
 
-	regmap_write(regmap, PLL_CAL_L_VAL(pll), FABIA_PLL_CAL);
+	if (!(pll->flags & SYNC_CAL_L_VAL))
+		regmap_write(regmap, PLL_CAL_L_VAL(pll), FABIA_PLL_CAL);
+	else if (config->l)
+		regmap_write(regmap, PLL_CAL_L_VAL(pll), config->l);
 
 	if (config->alpha)
 		regmap_write(regmap, PLL_FRAC(pll), config->alpha);
@@ -1389,6 +1392,14 @@ static int alpha_pll_fabia_set_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 	regmap_write(pll->clkr.regmap, PLL_L_VAL(pll), l);
+	if (pll->flags & SYNC_CAL_L_VAL) {
+		/*
+		* pll_cal_l_val is set to pll_l_val on MOST legacy targets. Set
+		* it explicitly here for PLL out-of-reset calibration to work
+		* without a glitch on all of them.
+		*/
+		regmap_write(pll->clkr.regmap, PLL_CAL_L_VAL(pll), l);
+	}
 	regmap_write(pll->clkr.regmap, PLL_FRAC(pll), a);
 
 	return __clk_alpha_pll_update_latch(pll);
@@ -1409,6 +1420,10 @@ static int alpha_pll_fabia_prepare(struct clk_hw *hw)
 	u64 a;
 	u32 cal_l, regval;
 	int ret;
+
+	/* Let the PLL handle the calibration if syncing pll_cal_l_val */
+	if (pll->flags & SYNC_CAL_L_VAL)
+		return 0;
 
 	/* Check if calibration needs to be done i.e. PLL is in reset */
 	ret = regmap_read(pll->clkr.regmap, PLL_MODE(pll), &regval);

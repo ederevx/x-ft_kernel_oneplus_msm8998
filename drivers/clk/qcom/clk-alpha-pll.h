@@ -87,6 +87,7 @@ struct clk_alpha_pll {
 #define SUPPORTS_DYNAMIC_UPDATE	BIT(3)
 	/* associated with soft_vote for multiple PLL software instances */
 #define SUPPORTS_FSM_VOTE	BIT(4)
+#define SYNC_CAL_L_VAL	BIT(5)
 	u8 flags;
 
 	struct clk_regmap clkr;
