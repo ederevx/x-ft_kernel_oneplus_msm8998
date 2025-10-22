@@ -138,18 +138,11 @@ static struct clk_fixed_factor gcc_ce1_axi_m_clk = {
 	},
 };
 
-static struct pll_vco fabia_vco[] = {
-	{ 249600000, 2000000000, 0 },
-	{ 125000000, 1000000000, 1 },
-};
-
 static unsigned int soft_vote_gpll0;
 
 static struct clk_alpha_pll gpll0 = {
 	.offset = 0x0,
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
-	.vco_table = fabia_vco,
-	.num_vco = ARRAY_SIZE(fabia_vco),
 	.soft_vote = &soft_vote_gpll0,
 	.soft_vote_mask = PLL_SOFT_VOTE_PRIMARY,
 	.flags = SUPPORTS_FSM_VOTE,
