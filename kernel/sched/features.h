@@ -136,6 +136,12 @@ SCHED_FEAT(FBT_STRICT_ORDER, false)
 SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, false)
 
 /*
+ * Configures the scheduler to use the UCLAMP min value percentage over 
+ * SCHED_CAPACITY_SCALE for schedtune SPC boosting.
+ */
+SCHED_FEAT(UCLAMP_MIN_SPC_BOOST, true)
+
+/*
  * Request max frequency from schedutil whenever a RT task is running.
  */
 SCHED_FEAT(SUGOV_RT_MAX_FREQ, false)

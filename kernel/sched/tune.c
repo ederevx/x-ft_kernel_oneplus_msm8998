@@ -13,6 +13,9 @@
 
 bool schedtune_initialized = false;
 extern struct reciprocal_value schedtune_spc_rdiv;
+#ifdef CONFIG_UCLAMP_TASK
+extern struct reciprocal_value uclamp_spc_rdiv;
+#endif
 
 /* We hold schedtune boost in effect for at least this long */
 #define SCHEDTUNE_BOOST_HOLD_NS 50000000ULL
@@ -816,6 +819,9 @@ static int
 schedtune_init(void)
 {
 	schedtune_spc_rdiv = reciprocal_value(100);
+#ifdef CONFIG_UCLAMP_TASK
+	uclamp_spc_rdiv = reciprocal_value(SCHED_CAPACITY_SCALE);
+#endif
 	schedtune_init_cgroups();
 	return 0;
 }

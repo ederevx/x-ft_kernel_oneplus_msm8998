@@ -6908,6 +6908,9 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p,
 
 #ifdef CONFIG_SCHED_TUNE
 struct reciprocal_value schedtune_spc_rdiv;
+#ifdef CONFIG_UCLAMP_TASK
+struct reciprocal_value uclamp_spc_rdiv;
+#endif
 
 static long
 schedtune_margin(unsigned long signal, long boost, long capacity)
@@ -6937,11 +6940,31 @@ schedtune_margin(unsigned long signal, long boost, long capacity)
 	return margin;
 }
 
+#ifdef CONFIG_UCLAMP_TASK
+static inline int
+uclamp_cpu_min_boost(unsigned long util, int cpu, struct task_struct *p)
+{
+	unsigned long min_util;
+
+	/* This will fetch effective RQ UCLAMP min by setting util to 0 */
+	min_util = uclamp_rq_util_with(cpu_rq(cpu), 0, p);
+	if (min_util > util)
+		return 0;
+
+	return reciprocal_divide(min_util, uclamp_spc_rdiv);
+}
+#endif
+
 inline long
 schedtune_cpu_margin_with(unsigned long util, int cpu, struct task_struct *p)
 {
 	int boost = schedtune_cpu_boost_with(cpu, p);
 	long margin;
+
+#ifdef CONFIG_UCLAMP_TASK
+	if (uclamp_is_used() && sched_feat(UCLAMP_MIN_SPC_BOOST))
+		boost = uclamp_cpu_min_boost(util, cpu, p);
+#endif
 
 	if (boost == 0)
 		margin = 0;
@@ -6951,6 +6974,20 @@ schedtune_cpu_margin_with(unsigned long util, int cpu, struct task_struct *p)
 	return margin;
 }
 
+#ifdef CONFIG_UCLAMP_TASK
+static inline int
+uclamp_task_min_boost(struct task_struct *task)
+{
+	unsigned long min_util;
+
+	min_util = uclamp_eff_value(task, UCLAMP_MIN);
+	if (min_util > task_util_est(task))
+		return 0;
+
+	return reciprocal_divide(min_util, uclamp_spc_rdiv);
+}
+#endif
+
 static inline long
 schedtune_task_margin(struct task_struct *task)
 {
@@ -6958,14 +6995,18 @@ schedtune_task_margin(struct task_struct *task)
 	unsigned long util;
 	long margin;
 
+#ifdef CONFIG_UCLAMP_TASK
+	if (uclamp_is_used()) {
+		if (sched_feat(UCLAMP_MIN_SPC_BOOST))
+			boost = uclamp_task_min_boost(task);
+		/* If schedtune was turned on by UCLAMP, do not add margin */
+		else if (boost == uclamp_boosted(task))
+			return 0;
+	}
+#endif
+
 	if (boost == 0)
 		return 0;
-
-#ifdef CONFIG_UCLAMP_TASK
-	/* If schedtune was turned on by UCLAMP, do not add margin */
-	if (boost == uclamp_boosted(task))
-		return 0;
-#endif
 
 	util = task_util_est(task);
 	margin = schedtune_margin(util, boost, SCHED_CAPACITY_SCALE);
