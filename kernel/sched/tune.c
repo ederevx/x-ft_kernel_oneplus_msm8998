@@ -523,6 +523,12 @@ int schedtune_cpu_boost_with(int cpu, struct task_struct *p)
 	u64 now;
 	int task_boost = p ? schedtune_task_boost(p) : -100;
 
+#ifdef CONFIG_UCLAMP_TASK
+	/* Don't calculate CPU boost margin if UCLAMP enabled */
+	if (p && task_boost == uclamp_boosted(p))
+		task_boost = -100;
+#endif
+
 	bg = &per_cpu(cpu_boost_groups, cpu);
 	now = sched_clock_cpu(cpu);
 
