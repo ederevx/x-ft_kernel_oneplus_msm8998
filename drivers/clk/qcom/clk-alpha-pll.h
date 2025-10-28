@@ -187,7 +187,7 @@ static const struct clk_div_table clk_alpha_2bit_div_table[] = {
 
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			     const struct alpha_pll_config *config);
-void clk_fabia_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
+int clk_fabia_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 				const struct alpha_pll_config *config);
 int clk_alpha_pll_trion_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 				const struct alpha_pll_config *config);
