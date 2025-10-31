@@ -417,8 +417,6 @@ int gpucc_msm8998_probe(struct platform_device *pdev)
 	/* Clear the DBG_CLK_DIV bits of the GPU debug register */
 	regmap_update_bits(regmap, 0x120, (3 << 17), 0);
 
-	clk_fabia_pll_configure(&gpu_pll0_pll, regmap, &gpu_pll0_config);
-
 	/* Tweak droop detector (GPUCC_GPU_DD_WRAP_CTRL) to reduce leakage */
 	regmap_write_bits(regmap, GPUCC_GPU_DD_WRAP_CTRL, BIT(0), BIT(0));
 
@@ -488,6 +486,8 @@ int gpucc_early_msm8998_probe(struct platform_device *pdev)
 				"Unable to get vdd_mx regulator\n");
 		return PTR_ERR(vdd_gpucc_mx.regulator[0]);
 	}
+
+	clk_fabia_pll_configure(&gpu_pll0_pll, regmap, &gpu_pll0_config);
 
 	rc = qcom_cc_really_probe(pdev, &gpucc_early_msm8998_desc, regmap);
 	if (rc) {
