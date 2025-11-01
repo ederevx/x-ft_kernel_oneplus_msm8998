@@ -69,11 +69,16 @@ static uint32_t copyback = 0;
 static bool pcc_enabled = false;
 static bool mdss_backlight_enable = false;
 
-static inline int flicker_free_push(struct msm_fb_data_type *mfd, int val)
+static inline int 
+flicker_free_push(struct msm_fb_data_type *mfd, int bl_lvl, bool enable)
 {
 	uint32_t backlight, temp, depth;
 
-	backlight = clamp_t(int, (((val - 1) * (BACKLIGHT_INDEX - 1)) /
+	/* Override bl_lvl if we're disabling flicker free */
+	if (!enable)
+		bl_lvl = elvss_off_threshold;
+
+	backlight = clamp_t(int, (((bl_lvl - 1) * (BACKLIGHT_INDEX - 1)) /
 					(elvss_off_threshold - 1)) + 1, 1, BACKLIGHT_INDEX);
 	temp = clamp_t(int, 0x80 * bkl_to_pcc[backlight - 1], FF_MIN_SCALE,
 					FF_MAX_SCALE);
@@ -100,7 +105,7 @@ static inline int flicker_free_push(struct msm_fb_data_type *mfd, int val)
 
 	/* Configure pcc values */
 	pcc_config.ops = MDP_PP_OPS_WRITE;
-	if (pcc_enabled)
+	if (enable)
 		pcc_config.ops |= MDP_PP_OPS_ENABLE;
 	else
 		pcc_config.ops |= MDP_PP_OPS_DISABLE;
@@ -119,21 +124,22 @@ static inline int flicker_free_push(struct msm_fb_data_type *mfd, int val)
 uint32_t mdss_panel_calc_backlight(uint32_t bl_lvl)
 {
 	struct msm_fb_data_type *mfd = ff_mfd;
+	bool target_pcc_en = mdss_backlight_enable;
 
 	if (!mfd)
 		return bl_lvl;
 
-	if (mdss_backlight_enable && bl_lvl < elvss_off_threshold) {
-		pcc_enabled = true;
-		if (!flicker_free_push(mfd, bl_lvl))
+	/* We don't need flicker free above elvss */
+	if (bl_lvl >= elvss_off_threshold)
+		target_pcc_en = false;
+
+	if (target_pcc_en || pcc_enabled) {
+		/* Only configure target pcc_enabled if we're successful */
+		if (!flicker_free_push(mfd, bl_lvl, target_pcc_en))
+			pcc_enabled = target_pcc_en;
+
+		if (pcc_enabled)
 			return elvss_off_threshold;
-	} else if (pcc_enabled) {
-		/* Ensure the pcc config is disabled, else retain bl_lvl */
-		if (flicker_free_push(mfd, elvss_off_threshold)) {
-			if (bl_lvl < elvss_off_threshold)
-				return elvss_off_threshold;
-		} else
-			pcc_enabled = false;
 	}
 
 	return bl_lvl;
@@ -156,13 +162,14 @@ static ssize_t ff_write_proc(struct file *file, const char __user *buffer,
 	state = (value != '0');
 
 	if (mdss_backlight_enable != state) {
-		mdss_backlight_enable = state;
-
 		/* Reset backlight */
 		mutex_lock(&mfd->bl_lock);
-		mdss_fb_set_backlight(mfd, 0);
-		mdss_fb_set_backlight(mfd, mfd->bl_level_usr);
+		mfd->unset_bl_level = mfd->bl_level_usr;
+		mfd->allow_bl_update = false;
 		mutex_unlock(&mfd->bl_lock);
+
+		mdss_backlight_enable = state;
+		mdss_fb_update_backlight(mfd);
 	}
 
 	return count;
