@@ -91,7 +91,7 @@
 		pm8998_s5: regulator-s5 {
 			regulator-min-microvolt = <1904000>;
 			regulator-max-microvolt = <2040000>;
-			qcom,init-pin-ctrl-mode = <16>;		/* PMIC_AWAKE */
+			qcom,init-pin-ctrl-mode = <8>;		/* HW3_EN */
 			qcom,send-defaults;
 			status = "okay";
 		};
@@ -102,7 +102,7 @@
 		pm8998_s7: regulator-s7 {
 			regulator-min-microvolt = <900000>;
 			regulator-max-microvolt = <1028000>;
-			qcom,init-pin-ctrl-mode = <16>;		/* PMIC_AWAKE */
+			qcom,init-pin-ctrl-mode = <8>;		/* HW3_EN */
 			qcom,send-defaults;
 			status = "okay";
 		};
