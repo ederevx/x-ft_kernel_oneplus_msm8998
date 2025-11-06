@@ -23,6 +23,7 @@
  *
  * @hwcg_reg: dynamic hardware clock gating register
  * @hwcg_bit: ORed with @hwcg_reg to enable dynamic hardware clock gating
+ * @retain_cbcr: CBCR registers to be retained and not toggled
  * @halt_reg: halt register
  * @halt_bit: ANDed with @halt_reg to test for clock halted
  * @halt_check: type of halt checking to perform
@@ -35,6 +36,7 @@
 struct clk_branch {
 	u32	hwcg_reg;
 	u32	halt_reg;
+	u32	retain_cbcr;
 	u8	hwcg_bit;
 	u8	halt_bit;
 	u8	halt_check;

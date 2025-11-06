@@ -152,7 +152,7 @@ static int clk_branch_enable(struct clk_hw *hw)
 }
 
 static int clk_cbcr_set_flags(struct regmap *regmap, unsigned int reg,
-				unsigned long flags)
+				unsigned long flags, u32 retain_cbcr)
 {
 	u32 cbcr_val = 0;
 	u32 cbcr_mask;
@@ -183,6 +183,10 @@ static int clk_cbcr_set_flags(struct regmap *regmap, unsigned int reg,
 		return -EINVAL;
 	}
 
+	/* Retain specified cbcr registers */
+	if (cbcr_mask & retain_cbcr)
+		return 0;
+
 	ret = regmap_update_bits(regmap, reg, cbcr_mask, cbcr_val);
 	if (ret)
 		return ret;
@@ -203,7 +207,8 @@ static int clk_branch_set_flags(struct clk_hw *hw, unsigned int flags)
 {
 	struct clk_branch *br = to_clk_branch(hw);
 
-	return clk_cbcr_set_flags(br->clkr.regmap, br->halt_reg, flags);
+	return clk_cbcr_set_flags(br->clkr.regmap, br->halt_reg, flags, 
+					br->retain_cbcr);
 }
 
 const struct clk_ops clk_branch_ops = {
@@ -529,7 +534,7 @@ static int clk_gate2_set_flags(struct clk_hw *hw, unsigned flags)
 	struct clk_gate2 *gt = to_clk_gate2(hw);
 
 	return clk_cbcr_set_flags(gt->clkr.regmap, gt->clkr.enable_reg,
-					flags);
+					flags, 0);
 }
 
 const struct clk_ops clk_gate2_ops = {
