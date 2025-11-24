@@ -3295,11 +3295,18 @@ void adm_copp_mfc_cfg(int port_id, int copp_idx, int dst_sample_rate)
 	param_hdr.param_id = AUDPROC_PARAM_ID_MFC_OUTPUT_MEDIA_FORMAT;
 	param_hdr.param_size = sizeof(mfc_cfg);
 
+#if 0
 	mfc_cfg.sampling_rate = dst_sample_rate;
 	mfc_cfg.bits_per_sample =
 		atomic_read(&this_adm.copp.bit_width[port_idx][copp_idx]);
 	open.dev_num_channel = mfc_cfg.num_channels =
 		atomic_read(&this_adm.copp.channels[port_idx][copp_idx]);
+#else
+	/* Force 192kHz, 24-bit, 7.1-channel MFC processing  */
+	mfc_cfg.sampling_rate = 192000;
+	mfc_cfg.bits_per_sample = 24;
+	open.dev_num_channel = mfc_cfg.num_channels = 8;
+#endif
 
 	rc = adm_arrange_mch_map(&open, ADM_PATH_PLAYBACK,
 		mfc_cfg.num_channels, port_idx);
