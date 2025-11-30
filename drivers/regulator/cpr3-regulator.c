@@ -359,11 +359,6 @@ static LIST_HEAD(cpr3_controller_list);
 static struct dentry *cpr3_debugfs_base;
 #endif
 
-/* UGLY UGLY UGLY HACK for fast bringup */
-#define CPR3_MAX_INSTANCES		15
-struct cpr3_controller *cpr3_ctrls[CPR3_MAX_INSTANCES];
-static int num_cpr3_instances = 0;
-
 /**
  * cpr3_read() - read four bytes from the memory address specified
  * @ctrl:		Pointer to the CPR3 controller
@@ -6356,17 +6351,15 @@ int cpr3_regulator_resume(struct cpr3_controller *ctrl)
 
 static int cpr3_regulator_starting_cpu(unsigned int cpu)
 {
-	struct cpr3_controller *ctrl = NULL;
-	int i;
+	struct cpr3_controller *ctrl;
 
-	for (i = 0; i <= num_cpr3_instances; i++) {
-		ctrl = cpr3_ctrls[num_cpr3_instances];
-		if (unlikely(ctrl == NULL))
-			continue;
+	mutex_lock(&cpr3_controller_list_mutex);
 
+	list_for_each_entry(ctrl, &cpr3_controller_list, list)
 		if (cpumask_test_cpu(cpu, &ctrl->irq_affinity_mask))
 			irq_set_affinity(ctrl->irq, &ctrl->irq_affinity_mask);
-	}
+
+	mutex_unlock(&cpr3_controller_list_mutex);
 
 	return 0;
 }
@@ -6619,9 +6612,6 @@ int cpr3_regulator_register(struct platform_device *pdev,
 		}
 	}
 
-	num_cpr3_instances++;
-	cpr3_ctrls[num_cpr3_instances] = ctrl;
-
 	if (ctrl->irq && !cpumask_empty(&ctrl->irq_affinity_mask)) {
 		irq_set_affinity(ctrl->irq, &ctrl->irq_affinity_mask);
 
@@ -6629,8 +6619,6 @@ int cpr3_regulator_register(struct platform_device *pdev,
 					"regulator/cpr3:online",
 					cpr3_regulator_starting_cpu, NULL);
 		if (rc) {
-			cpr3_ctrls[num_cpr3_instances] = NULL;
-			num_cpr3_instances--;
 			pr_err("Cannot register CPUHP for CPR3.\n");
 			goto free_regulators;
 		}
