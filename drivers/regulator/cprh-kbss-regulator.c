@@ -2924,20 +2924,29 @@ static int cprh_kbss_init_controller(struct cpr3_controller *ctrl)
 	return 0;
 }
 
-static int cprh_kbss_regulator_suspend(struct platform_device *pdev,
-				pm_message_t state)
+#if CONFIG_PM
+static int cprh_kbss_regulator_suspend(struct device *dev)
 {
-	struct cpr3_controller *ctrl = platform_get_drvdata(pdev);
+	struct cpr3_controller *ctrl = dev_get_drvdata(dev);
 
 	return cpr3_regulator_suspend(ctrl);
 }
 
-static int cprh_kbss_regulator_resume(struct platform_device *pdev)
+static int cprh_kbss_regulator_resume(struct device *dev)
 {
-	struct cpr3_controller *ctrl = platform_get_drvdata(pdev);
+	struct cpr3_controller *ctrl = dev_get_drvdata(dev);
 
 	return cpr3_regulator_resume(ctrl);
 }
+#else
+#define cprh_kbss_regulator_suspend NULL
+#define cprh_kbss_regulator_resume NULL
+#endif
+
+static const struct dev_pm_ops cprh_kbss_regulator_pm_ops = {
+	.suspend_noirq		= cprh_kbss_regulator_suspend,
+	.resume_noirq		= cprh_kbss_regulator_resume,
+};
 
 /* Data corresponds to the SoC revision */
 static const struct of_device_id cprh_regulator_match_table[] = {
@@ -3093,11 +3102,10 @@ static struct platform_driver cprh_kbss_regulator_driver = {
 		.name		= "qcom,cprh-kbss-regulator",
 		.of_match_table	= cprh_regulator_match_table,
 		.owner		= THIS_MODULE,
+		.pm			= &cprh_kbss_regulator_pm_ops,
 	},
 	.probe		= cprh_kbss_regulator_probe,
 	.remove		= cprh_kbss_regulator_remove,
-	.suspend	= cprh_kbss_regulator_suspend,
-	.resume		= cprh_kbss_regulator_resume,
 };
 
 static int cpr_regulator_init(void)
