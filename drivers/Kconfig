@@ -225,5 +225,14 @@ source "drivers/esoc/Kconfig"
 
 source "drivers/cpuquiet/Kconfig"
 
-source "drivers/kernelsu/Kconfig"
+config KSU
+    bool
+    default n
+
+config KSU_SRC
+    string
+    default "drivers/Kconfig.dummy" if !KSU
+    default "drivers/kernelsu/Kconfig" if KSU
+
+source "$KSU_SRC"
 endmenu
