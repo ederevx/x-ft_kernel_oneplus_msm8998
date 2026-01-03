@@ -1,0 +1,20 @@
+menu "KernelSU dummy configs"
+
+# Assume CONFIG_KSU is present to retain config if regen.
+
+config KSU_DEBUG
+	bool
+
+config KSU_ALLOWLIST_WORKAROUND
+	bool
+
+config KSU_MANUAL_HOOK
+	bool
+	default y if !KPROBES
+
+config KSU_KPROBES_HOOK
+	bool
+	default y if KPROBES && KRETPROBES && HAVE_SYSCALL_TRACEPOINTS
+	default y if !KSU_MANUAL_HOOK
+
+endmenu
