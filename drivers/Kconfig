@@ -225,5 +225,19 @@ source "drivers/esoc/Kconfig"
 
 source "drivers/cpuquiet/Kconfig"
 
-source "drivers/kernelsu/Kconfig"
+menu "KSU support"
+
+config KSU_DEFINED
+    string
+    option env="KSUDEFINED"
+
+config KSU_SRC
+    string
+    default "drivers/Kconfig.ksu.dummy" if KSU_DEFINED != "1"
+    default "drivers/kernelsu/Kconfig" if KSU_DEFINED = "1"
+
+source "$KSU_SRC"
+
+endmenu
+
 endmenu
