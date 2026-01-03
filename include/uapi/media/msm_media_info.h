@@ -235,11 +235,11 @@ enum color_fmts {
 	 * UV_Meta_Stride = align(roundup(Width, UV_TileWidth), 64)
 	 * UV_Meta_Scanlines = align(roundup(Height, UV_TileHeight), 16)
 	 * UV_Meta_Plane_size = align(UV_Meta_Stride * UV_Meta_Scanlines, 4096)
-	 * Extradata = 8k
+	 * Extradata = 16k
 	 *
 	 * Total size = align( Y_UBWC_Plane_size + UV_UBWC_Plane_size +
 	 *           Y_Meta_Plane_size + UV_Meta_Plane_size
-	 *           + max(Extradata, Y_Stride * 48), 4096)
+	 *           + max(Extradata, Y_Stride * 64), 4096)
 	 *
 	 *
 	 * (2) Venus NV12 UBWC Interlaced Buffer Format:
@@ -413,13 +413,13 @@ enum color_fmts {
 	 * UV_BF_Meta_Scanlines = align(roundup(Half_height, UV_TileHeight), 16)
 	 * UV_BF_Meta_Plane_size =
 	 *     align(UV_BF_Meta_Stride * UV_BF_Meta_Scanlines, 4096)
-	 * Extradata = 8k
+	 * Extradata = 16k
 	 *
 	 * Total size = align( Y_UBWC_TF_Plane_size + UV_UBWC_TF_Plane_size +
 	 *           Y_TF_Meta_Plane_size + UV_TF_Meta_Plane_size +
 	 *			 Y_UBWC_BF_Plane_size + UV_UBWC_BF_Plane_size +
 	 *           Y_BF_Meta_Plane_size + UV_BF_Meta_Plane_size +
-	 *           + max(Extradata, Y_TF_Stride * 48), 4096)
+	 *           + max(Extradata, Y_TF_Stride * 64), 4096)
 	 */
 	COLOR_FMT_NV12_UBWC,
 	/* Venus NV12 10-bit UBWC:
@@ -504,11 +504,11 @@ enum color_fmts {
 	 * UV_Meta_Stride = align(roundup(Width, UV_TileWidth), 64)
 	 * UV_Meta_Scanlines = align(roundup(Height, UV_TileHeight), 16)
 	 * UV_Meta_Plane_size = align(UV_Meta_Stride * UV_Meta_Scanlines, 4096)
-	 * Extradata = 8k
+	 * Extradata = 16k
 	 *
 	 * Total size = align(Y_UBWC_Plane_size + UV_UBWC_Plane_size +
 	 *           Y_Meta_Plane_size + UV_Meta_Plane_size
-	 *           + max(Extradata, Y_Stride * 48), 4096)
+	 *           + max(Extradata, Y_Stride * 64), 4096)
 	 */
 	COLOR_FMT_NV12_BPP10_UBWC,
 	/* Venus RGBA8888 format:
@@ -1393,7 +1393,7 @@ static inline unsigned int VENUS_BUFFER_SIZE(
 
 		size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
 			uv_meta_plane)*2 +
-			MSM_MEDIA_MAX(extra_size + 8192, 48 * y_stride);
+			MSM_MEDIA_MAX(extra_size + 8192, 64 * y_stride);
 		size = MSM_MEDIA_ALIGN(size, 4096);
 		break;
 	case COLOR_FMT_NV12_BPP10_UBWC:
@@ -1410,7 +1410,7 @@ static inline unsigned int VENUS_BUFFER_SIZE(
 
 		size = y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
 			uv_meta_plane +
-			MSM_MEDIA_MAX(extra_size + 8192, 48 * y_stride);
+			MSM_MEDIA_MAX(extra_size + 8192, 64 * y_stride);
 		size = MSM_MEDIA_ALIGN(size, 4096);
 		break;
 	case COLOR_FMT_P010_UBWC:
