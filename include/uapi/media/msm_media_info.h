@@ -1458,6 +1458,7 @@ invalid_input:
 static inline unsigned int VENUS_BUFFER_SIZE_USED(
 	int color_fmt, int width, int height, int interlace)
 {
+	const unsigned int extra_size = VENUS_EXTRADATA_SIZE(width, height);
 	unsigned int size = 0;
 	unsigned int y_stride, uv_stride, y_sclines, uv_sclines;
 	unsigned int y_ubwc_plane = 0, uv_ubwc_plane = 0;
@@ -1486,7 +1487,8 @@ static inline unsigned int VENUS_BUFFER_SIZE_USED(
 		uv_meta_plane = MSM_MEDIA_ALIGN(uv_meta_stride *
 			uv_meta_scanlines, 4096);
 		size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
-			uv_meta_plane);
+			uv_meta_plane) +
+			MSM_MEDIA_MAX(extra_size + 8192, 64 * y_stride);
 		size = MSM_MEDIA_ALIGN(size, 4096);
 	} else {
 		size = VENUS_BUFFER_SIZE(color_fmt, width, height);
