@@ -1418,8 +1418,9 @@ static inline unsigned int VENUS_BUFFER_SIZE(
 			uv_meta_plane = MSM_MEDIA_ALIGN(uv_meta_stride *
 				uv_meta_scanlines, 4096);
 			size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
-				uv_meta_plane);
+				uv_meta_plane) + (64 * y_stride);
 		}
+		size += VENUS_EXTRADATA_SIZE(width, height);
 		size = MSM_MEDIA_ALIGN(size, 4096);
 		break;
 	case COLOR_FMT_NV12_BPP10_UBWC:
