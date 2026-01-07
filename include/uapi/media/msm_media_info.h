@@ -1,6 +1,11 @@
 #ifndef __MEDIA_INFO_H__
 #define __MEDIA_INFO_H__
 
+/* Width and Height should be multiple of 16 */
+#define INTERLACE_WIDTH_MAX 1920
+#define INTERLACE_HEIGHT_MAX 1920
+#define INTERLACE_MB_PER_FRAME_MAX ((1920*1088)/256)
+
 #ifndef MSM_MEDIA_ALIGN
 #define MSM_MEDIA_ALIGN(__sz, __align) (((__align) & ((__align) - 1)) ?\
 	((((__sz) + (__align) - 1) / (__align)) * (__align)) :\
@@ -1374,23 +1379,47 @@ static inline unsigned int VENUS_BUFFER_SIZE(
 		size = MSM_MEDIA_ALIGN(size, 4096);
 		break;
 	case COLOR_FMT_NV12_UBWC:
-		y_sclines = VENUS_Y_SCANLINES(color_fmt, (height+1)>>1);
-		y_ubwc_plane = MSM_MEDIA_ALIGN(y_stride * y_sclines, 4096);
-		uv_sclines = VENUS_UV_SCANLINES(color_fmt, (height+1)>>1);
-		uv_ubwc_plane = MSM_MEDIA_ALIGN(uv_stride * uv_sclines, 4096);
 		y_meta_stride = VENUS_Y_META_STRIDE(color_fmt, width);
-		y_meta_scanlines =
-			VENUS_Y_META_SCANLINES(color_fmt, (height+1)>>1);
-		y_meta_plane = MSM_MEDIA_ALIGN(
-			y_meta_stride * y_meta_scanlines, 4096);
 		uv_meta_stride = VENUS_UV_META_STRIDE(color_fmt, width);
-		uv_meta_scanlines =
+		if (width <= INTERLACE_WIDTH_MAX &&
+			height <= INTERLACE_HEIGHT_MAX &&
+			(height * width) / 256 <= INTERLACE_MB_PER_FRAME_MAX) {
+			y_sclines =
+				VENUS_Y_SCANLINES(color_fmt, (height+1)>>1);
+			y_ubwc_plane =
+				MSM_MEDIA_ALIGN(y_stride * y_sclines, 4096);
+			uv_sclines =
+				VENUS_UV_SCANLINES(color_fmt, (height+1)>>1);
+			uv_ubwc_plane =
+				MSM_MEDIA_ALIGN(uv_stride * uv_sclines, 4096);
+			y_meta_scanlines =
+			VENUS_Y_META_SCANLINES(color_fmt, (height+1)>>1);
+			y_meta_plane = MSM_MEDIA_ALIGN(
+				y_meta_stride * y_meta_scanlines, 4096);
+			uv_meta_scanlines =
 			VENUS_UV_META_SCANLINES(color_fmt, (height+1)>>1);
-		uv_meta_plane = MSM_MEDIA_ALIGN(uv_meta_stride *
-			uv_meta_scanlines, 4096);
-
-		size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
-			uv_meta_plane)*2;
+			uv_meta_plane = MSM_MEDIA_ALIGN(uv_meta_stride *
+				uv_meta_scanlines, 4096);
+			size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
+				uv_meta_plane)*2;
+		} else {
+			y_sclines = VENUS_Y_SCANLINES(color_fmt, height);
+			y_ubwc_plane =
+				MSM_MEDIA_ALIGN(y_stride * y_sclines, 4096);
+			uv_sclines = VENUS_UV_SCANLINES(color_fmt, height);
+			uv_ubwc_plane =
+				MSM_MEDIA_ALIGN(uv_stride * uv_sclines, 4096);
+			y_meta_scanlines =
+				VENUS_Y_META_SCANLINES(color_fmt, height);
+			y_meta_plane = MSM_MEDIA_ALIGN(
+				y_meta_stride * y_meta_scanlines, 4096);
+			uv_meta_scanlines =
+				VENUS_UV_META_SCANLINES(color_fmt, height);
+			uv_meta_plane = MSM_MEDIA_ALIGN(uv_meta_stride *
+				uv_meta_scanlines, 4096);
+			size = (y_ubwc_plane + uv_ubwc_plane + y_meta_plane +
+				uv_meta_plane);
+		}
 		size = MSM_MEDIA_ALIGN(size, 4096);
 		break;
 	case COLOR_FMT_NV12_BPP10_UBWC:
